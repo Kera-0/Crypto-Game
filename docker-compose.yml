@@ -1,0 +1,23 @@
+services:
+  frontend:
+    container_name: ${FRONTEND_HOST}
+    hostname: ${FRONTEND_HOST}
+    build:
+      context: ./frontend
+      dockerfile: ./Dockerfile
+      target: dev
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./.env
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    command: pnpm dev
+    networks:
+      - network_name
+
+networks:
+  network_name:
