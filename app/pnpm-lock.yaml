@@ -7,28 +7,32 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@openzeppelin/contracts':
+        specifier: ^5.4.0
+        version: 5.4.0
     devDependencies:
       '@nomicfoundation/hardhat-ignition':
         specifier: ^3.0.6
-        version: 3.0.6(@nomicfoundation/hardhat-verify@3.0.8(hardhat@3.1.3))(hardhat@3.1.3)
+        version: 3.0.7(@nomicfoundation/hardhat-verify@3.0.8(hardhat@3.1.5))(hardhat@3.1.5)
       '@nomicfoundation/hardhat-toolbox-viem':
         specifier: ^5.0.1
-        version: 5.0.1(ee04c79a54149f52c904e88435f23381)
+        version: 5.0.2(85231a14a7286b62004b8ecfc48ca681)
       '@types/node':
         specifier: ^22.19.5
-        version: 22.19.5
+        version: 22.19.7
       forge-std:
         specifier: github:foundry-rs/forge-std#v1.9.4
         version: https://codeload.github.com/foundry-rs/forge-std/tar.gz/1eea5bae12ae557d589f9f0f0edae2faa47cb262
       hardhat:
         specifier: ^3.1.3
-        version: 3.1.3
+        version: 3.1.5
       typescript:
         specifier: ~5.8.3
         version: 5.8.3
       viem:
         specifier: ^2.44.1
-        version: 2.44.1(typescript@5.8.3)(zod@3.25.76)
+        version: 2.45.1(typescript@5.8.3)(zod@3.25.76)
 
 packages:
 
@@ -348,21 +352,21 @@ packages:
   '@nomicfoundation/hardhat-errors@3.0.6':
     resolution: {integrity: sha512-3x+OVdZv7Rgy3z6os9pB6kiHLxs6q0PCXHRu+WLZflr44PG9zW+7V9o+ehrUqmmivlHcIFr3Qh4M2wZVuoCYww==}
 
-  '@nomicfoundation/hardhat-ignition-viem@3.0.6':
-    resolution: {integrity: sha512-5c3O1EytJ5IMoMfGK9Qf146oeYOOwYchDUMK32AU/9Dlal1fqgb0Y+ic/0QS/ijhpePj4wgVhmiDG1BHoP67/A==}
+  '@nomicfoundation/hardhat-ignition-viem@3.0.7':
+    resolution: {integrity: sha512-fdufOU9ArxQAt9PkQl0rdlgi2vjXEOGmyvclHXBKO+SpAUlbwtIag00ohNbjc7p4u6ptApbIlKedYMT056B+9A==}
     peerDependencies:
-      '@nomicfoundation/hardhat-ignition': ^3.0.6
+      '@nomicfoundation/hardhat-ignition': ^3.0.7
       '@nomicfoundation/hardhat-verify': ^3.0.0
-      '@nomicfoundation/hardhat-viem': ^3.0.0
-      '@nomicfoundation/ignition-core': ^3.0.6
-      hardhat: ^3.0.0
-      viem: ^2.30.0
+      '@nomicfoundation/hardhat-viem': ^3.0.2
+      '@nomicfoundation/ignition-core': ^3.0.7
+      hardhat: ^3.1.5
+      viem: ^2.43.0
 
-  '@nomicfoundation/hardhat-ignition@3.0.6':
-    resolution: {integrity: sha512-o5nkadpYS0LsYQzYO56pTvYngtXmB72FRTZcAMEHG+K9TMjI7EHPn4ecXmatJ5fbUSf/CplkqWxbKkOaVnfqXg==}
+  '@nomicfoundation/hardhat-ignition@3.0.7':
+    resolution: {integrity: sha512-yzVXNHoEanOGRFMkpgvGaWw4Kev5ragxFFyrKITKtiJMdChdGNAPlbsk8QJzn4028aSAnjRfqKTOAeeBlsqFig==}
     peerDependencies:
       '@nomicfoundation/hardhat-verify': ^3.0.0
-      hardhat: ^3.0.0
+      hardhat: ^3.1.5
 
   '@nomicfoundation/hardhat-keystore@3.0.3':
     resolution: {integrity: sha512-rkwfdy/GsX/2SV49RGBvMsCuR+SYGJQGD3wcrS5m2Cyap5eQFEgKZbqpua6YQRA2raxRmVVH6antIIftgBFXAQ==}
@@ -382,52 +386,55 @@ packages:
     peerDependencies:
       hardhat: ^3.0.0
 
-  '@nomicfoundation/hardhat-toolbox-viem@5.0.1':
-    resolution: {integrity: sha512-NhPQjHwTk356k6WS7tPeEWS5ymtlZe2lzcZzvgd2AD7wrMXE/zUu5qacXgwPq/M6HVEczSpuFeu+/koQgA2pbA==}
+  '@nomicfoundation/hardhat-toolbox-viem@5.0.2':
+    resolution: {integrity: sha512-b0hMvronSuryRiQrmB6DxFbpUFB3dMpIVpqCE/zYxG31IakEiuBG1Z/ky5BERVJJSD0nkCAH4wF33GS4PS6UZw==}
     peerDependencies:
-      '@nomicfoundation/hardhat-ignition': ^3.0.0
-      '@nomicfoundation/hardhat-ignition-viem': ^3.0.0
+      '@nomicfoundation/hardhat-ignition': ^3.0.7
+      '@nomicfoundation/hardhat-ignition-viem': ^3.0.7
       '@nomicfoundation/hardhat-keystore': ^3.0.0
       '@nomicfoundation/hardhat-network-helpers': ^3.0.0
       '@nomicfoundation/hardhat-node-test-runner': ^3.0.0
       '@nomicfoundation/hardhat-verify': ^3.0.0
-      '@nomicfoundation/hardhat-viem': ^3.0.0
-      '@nomicfoundation/hardhat-viem-assertions': ^3.0.0
-      '@nomicfoundation/ignition-core': ^3.0.0
+      '@nomicfoundation/hardhat-viem': ^3.0.2
+      '@nomicfoundation/hardhat-viem-assertions': ^3.0.5
+      '@nomicfoundation/ignition-core': ^3.0.7
       hardhat: ^3.0.0
-      viem: ^2.30.0
+      viem: ^2.43.0
 
-  '@nomicfoundation/hardhat-utils@3.0.5':
-    resolution: {integrity: sha512-5zkQSuSxkwK7fQxKswJ1GGc/3AuWBSmxA7GhczTPLx28dAXQnubRU8nA48SkCkKesJq5x4TROP+XheSE2VkLUA==}
+  '@nomicfoundation/hardhat-utils@3.0.6':
+    resolution: {integrity: sha512-AD/LPNdjXNFRrZcaAAewgJpdnHpPppZxo5p+x6wGMm5Hz4B3+oLf/LUzVn8qb4DDy9RE2c24l2F8vmL/w6ZuXg==}
+
+  '@nomicfoundation/hardhat-vendored@3.0.0':
+    resolution: {integrity: sha512-bzIOdG4iAuYSs9JSnaVOtH7qUKJ6W5+OtOiL8MlyFuLKYN2hjIisGO4pY5zR4N7xi/3RjfcnjVNz8tU0DPg2Cw==}
 
   '@nomicfoundation/hardhat-verify@3.0.8':
     resolution: {integrity: sha512-AkwFvx/r0AFDk0H53mReYpkw2pvi5Jq34zAyk2+cTM7o/OnOvq0xcAaidw4BQvBf9+FMeFAKjJe+zNYgrsLatg==}
     peerDependencies:
       hardhat: ^3.0.0
 
-  '@nomicfoundation/hardhat-viem-assertions@3.0.4':
-    resolution: {integrity: sha512-MLImyHVuFEVNOcpJ0cjmpJ/IYj/mc2Kql6g9swX5Xtln13Gyv4jJFvoyjEalt8K9SYVTNY8kpDtVmQ2fP8BsDA==}
+  '@nomicfoundation/hardhat-viem-assertions@3.0.5':
+    resolution: {integrity: sha512-ADJIkkeVxo8SaPe2DHZwpdtqCeCCZGrh/4xyaMlfp8lxStIq2lYkLrzujPwNah4kDxJzpqVrVKjLCReA9WNYuw==}
     peerDependencies:
-      '@nomicfoundation/hardhat-viem': ^3.0.0
+      '@nomicfoundation/hardhat-viem': ^3.0.2
       hardhat: ^3.0.0
-      viem: ^2.30.0
+      viem: ^2.43.0
 
-  '@nomicfoundation/hardhat-viem@3.0.1':
-    resolution: {integrity: sha512-sUyi3Xn31vItf925YRgHp7x6FIFfG9B+jacWYyJ0RBi7BWCrC/aSUX4jRRmpzaZ4opLQ8KXAZdxS91Yka7AYtw==}
+  '@nomicfoundation/hardhat-viem@3.0.2':
+    resolution: {integrity: sha512-u/2IcKhfpD0toaC/P2Zqu+tMT7lDcs3mgp/RIQk8C+IAG0L3YMaCAjLKGWtMNhJQ/oqCM4rNBfdSe2ltvNCyXQ==}
     peerDependencies:
       hardhat: ^3.0.0
-      viem: ^2.30.0
+      viem: ^2.43.0
 
   '@nomicfoundation/hardhat-zod-utils@3.0.1':
     resolution: {integrity: sha512-I6/pyYiS9p2lLkzQuedr1ScMocH+ew8l233xTi+LP92gjEiviJDxselpkzgU01MUM0t6BPpfP8yMO958LDEJVg==}
     peerDependencies:
       zod: ^3.23.8
 
-  '@nomicfoundation/ignition-core@3.0.6':
-    resolution: {integrity: sha512-o5CTrlQ1PEQW85ppS7fxXCsSVl3j/T/3roTSA795lRJf7SQdJzr5y12rSTvoqR2YbeF5zDxVdqgzEqoMd8n6Cw==}
+  '@nomicfoundation/ignition-core@3.0.7':
+    resolution: {integrity: sha512-zlwXshSZIQQ4LfZBnirETQ/eNfEcxk9sRkPCYoeaGBEC8QPtt7KBj+rP7YYWM+IPVQNU4OjIVfQs004unpXB4w==}
 
-  '@nomicfoundation/ignition-ui@3.0.6':
-    resolution: {integrity: sha512-PePoQO4LwLfQyMGZOtbF5eOgYSu/kXCyif/0Jpto1dfFLAtvoUbvaLrecrclM/keCTriRADOauH/zH06ihzvCg==}
+  '@nomicfoundation/ignition-ui@3.0.7':
+    resolution: {integrity: sha512-K7bL7V1cEh7nccAiWD1L15QdtNiPoM37IJdvBhgxV4sa25//r9yIxHf/DHI52qxQXqQuXKWdiBZBcbldtStM1Q==}
 
   '@nomicfoundation/solidity-analyzer-darwin-arm64@0.1.2':
     resolution: {integrity: sha512-JaqcWPDZENCvm++lFFGjrDd8mxtf+CtLd2MiXvMNTBD33dContTZ9TWETwNFwg7JTJT5Q9HEecH7FA+HTSsIUw==}
@@ -461,6 +468,9 @@ packages:
     resolution: {integrity: sha512-q4n32/FNKIhQ3zQGGw5CvPF6GTvDCpYwIf7bEY/dZTZbgfDsHyjJwURxUJf3VQuuJj+fDIFl4+KkBVbw4Ef6jA==}
     engines: {node: '>= 12'}
 
+  '@openzeppelin/contracts@5.4.0':
+    resolution: {integrity: sha512-eCYgWnLg6WO+X52I16TZt8uEjbtdkgLC0SUX/xnAksjjrQI4Xfn4iBRoI5j55dmlOhDv1Y7BoR3cU7e3WWhC6A==}
+
   '@scure/base@1.1.9':
     resolution: {integrity: sha512-8YKhl8GHiNI/pU2VMaofa2Tor7PJRAjwQLBBuilkJ9L5+13yVbC7JO/wS7piioAvPSwR3JKM1IJ/u4xQzbcXKg==}
 
@@ -492,8 +502,8 @@ packages:
   '@streamparser/json@0.0.22':
     resolution: {integrity: sha512-b6gTSBjJ8G8SuO3Gbbj+zXbVx8NSs1EbpbMKpzGLWMdkR+98McH9bEjSz3+0mPJf68c5nxa3CrJHp5EQNXM6zQ==}
 
-  '@types/node@22.19.5':
-    resolution: {integrity: sha512-HfF8+mYcHPcPypui3w3mvzuIErlNOh2OAG+BCeBZCEwyiD5ls2SiCwEyT47OELtf7M3nHxBdu0FsmzdKxkN52Q==}
+  '@types/node@22.19.7':
+    resolution: {integrity: sha512-MciR4AKGHWl7xwxkBa6xUGxQJ4VBOmPTF7sL+iGzuahOFaO0jHCsuEfS80pan1ef4gWId1oWOweIhrDEYLuaOw==}
 
   '@types/node@22.7.5':
     resolution: {integrity: sha512-jML7s2NAzMWc//QSJ1a3prpk78cOPchGvXJsC3C6R6PSMoooztvRVQEz89gmBTBY1SPMaqo5teB4uNHPdetShQ==}
@@ -616,11 +626,11 @@ packages:
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
 
-  get-tsconfig@4.13.0:
-    resolution: {integrity: sha512-1VKTZJCwBrvbd+Wn3AOgQP/2Av+TfTCOlE4AcRJE72W1ksZXbAx8PPBR9RzgTeSPzlPMHrbANMH3LbltH73wxQ==}
+  get-tsconfig@4.13.1:
+    resolution: {integrity: sha512-EoY1N2xCn44xU6750Sx7OjOIT59FkmstNc3X6y5xpz7D5cBtZRe/3pSlTkDJgqsOk3WwZPkWfonhhUJfttQo3w==}
 
-  hardhat@3.1.3:
-    resolution: {integrity: sha512-/AQhdhEuT71KbOHIAX9apbVKEDGR4OKBp0GEgJN/J8mHDxGZ5580ULjhZZZ5ocydrxYDs2EkDljLOh4OgmLeOw==}
+  hardhat@3.1.5:
+    resolution: {integrity: sha512-0Z0KI/m6wJYCMZgDK3QuVqR59lSa3aMu6QHKqnbIYXKu/phQ+YFKJZAY4zkUKX21ZjcrrRg25qLUzZw1bO6g/A==}
     hasBin: true
 
   has-flag@4.0.0:
@@ -800,8 +810,8 @@ packages:
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
 
-  viem@2.44.1:
-    resolution: {integrity: sha512-wfQda7PIJeF9hWiGKV628AfBwyYxyoc89OcgF4s4/chs2PY8ibUA7IG+DWdU4oAkjhHm9w47w1m2dwwOPBU+ng==}
+  viem@2.45.1:
+    resolution: {integrity: sha512-LN6Pp7vSfv50LgwhkfSbIXftAM5J89lP9x8TeDa8QM7o41IxlHrDh0F9X+FfnCWtsz11pEVV5sn+yBUoOHNqYA==}
     peerDependencies:
       typescript: '>=5.0.4'
     peerDependenciesMeta:
@@ -822,18 +832,6 @@ packages:
 
   ws@8.18.3:
     resolution: {integrity: sha512-PEIGCY5tSlUt50cqyMXfCzX+oOPqN0vuGqWzbcJ2xvnkzkq46oOpz7dQaTDBdfICb4N14+GARUDw2XV2N4tvzg==}
-    engines: {node: '>=10.0.0'}
-    peerDependencies:
-      bufferutil: ^4.0.1
-      utf-8-validate: '>=5.0.2'
-    peerDependenciesMeta:
-      bufferutil:
-        optional: true
-      utf-8-validate:
-        optional: true
-
-  ws@8.19.0:
-    resolution: {integrity: sha512-blAT2mjOEIi0ZzruJfIhb3nps74PRWTCz1IjglWEEpQl5XS/UNama6u2/rjFkDDouqr4L67ry+1aGIALViWjDg==}
     engines: {node: '>=10.0.0'}
     peerDependencies:
       bufferutil: ^4.0.1
@@ -1140,32 +1138,32 @@ snapshots:
 
   '@nomicfoundation/hardhat-errors@3.0.6':
     dependencies:
-      '@nomicfoundation/hardhat-utils': 3.0.5
+      '@nomicfoundation/hardhat-utils': 3.0.6
     transitivePeerDependencies:
       - supports-color
 
-  '@nomicfoundation/hardhat-ignition-viem@3.0.6(@nomicfoundation/hardhat-ignition@3.0.6(@nomicfoundation/hardhat-verify@3.0.8(hardhat@3.1.3))(hardhat@3.1.3))(@nomicfoundation/hardhat-verify@3.0.8(hardhat@3.1.3))(@nomicfoundation/hardhat-viem@3.0.1(hardhat@3.1.3)(viem@2.44.1(typescript@5.8.3)(zod@3.25.76)))(@nomicfoundation/ignition-core@3.0.6)(hardhat@3.1.3)(viem@2.44.1(typescript@5.8.3)(zod@3.25.76))':
+  '@nomicfoundation/hardhat-ignition-viem@3.0.7(@nomicfoundation/hardhat-ignition@3.0.7(@nomicfoundation/hardhat-verify@3.0.8(hardhat@3.1.5))(hardhat@3.1.5))(@nomicfoundation/hardhat-verify@3.0.8(hardhat@3.1.5))(@nomicfoundation/hardhat-viem@3.0.2(hardhat@3.1.5)(viem@2.45.1(typescript@5.8.3)(zod@3.25.76)))(@nomicfoundation/ignition-core@3.0.7)(hardhat@3.1.5)(viem@2.45.1(typescript@5.8.3)(zod@3.25.76))':
     dependencies:
       '@nomicfoundation/hardhat-errors': 3.0.6
-      '@nomicfoundation/hardhat-ignition': 3.0.6(@nomicfoundation/hardhat-verify@3.0.8(hardhat@3.1.3))(hardhat@3.1.3)
-      '@nomicfoundation/hardhat-verify': 3.0.8(hardhat@3.1.3)
-      '@nomicfoundation/hardhat-viem': 3.0.1(hardhat@3.1.3)(viem@2.44.1(typescript@5.8.3)(zod@3.25.76))
-      '@nomicfoundation/ignition-core': 3.0.6
-      hardhat: 3.1.3
-      viem: 2.44.1(typescript@5.8.3)(zod@3.25.76)
+      '@nomicfoundation/hardhat-ignition': 3.0.7(@nomicfoundation/hardhat-verify@3.0.8(hardhat@3.1.5))(hardhat@3.1.5)
+      '@nomicfoundation/hardhat-verify': 3.0.8(hardhat@3.1.5)
+      '@nomicfoundation/hardhat-viem': 3.0.2(hardhat@3.1.5)(viem@2.45.1(typescript@5.8.3)(zod@3.25.76))
+      '@nomicfoundation/ignition-core': 3.0.7
+      hardhat: 3.1.5
+      viem: 2.45.1(typescript@5.8.3)(zod@3.25.76)
     transitivePeerDependencies:
       - supports-color
 
-  '@nomicfoundation/hardhat-ignition@3.0.6(@nomicfoundation/hardhat-verify@3.0.8(hardhat@3.1.3))(hardhat@3.1.3)':
+  '@nomicfoundation/hardhat-ignition@3.0.7(@nomicfoundation/hardhat-verify@3.0.8(hardhat@3.1.5))(hardhat@3.1.5)':
     dependencies:
       '@nomicfoundation/hardhat-errors': 3.0.6
-      '@nomicfoundation/hardhat-utils': 3.0.5
-      '@nomicfoundation/hardhat-verify': 3.0.8(hardhat@3.1.3)
-      '@nomicfoundation/ignition-core': 3.0.6
-      '@nomicfoundation/ignition-ui': 3.0.6
+      '@nomicfoundation/hardhat-utils': 3.0.6
+      '@nomicfoundation/hardhat-verify': 3.0.8(hardhat@3.1.5)
+      '@nomicfoundation/ignition-core': 3.0.7
+      '@nomicfoundation/ignition-ui': 3.0.7
       chalk: 5.6.2
       debug: 4.4.3
-      hardhat: 3.1.3
+      hardhat: 3.1.5
       json5: 2.2.3
       prompts: 2.4.2
     transitivePeerDependencies:
@@ -1173,25 +1171,25 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@nomicfoundation/hardhat-keystore@3.0.3(hardhat@3.1.3)':
+  '@nomicfoundation/hardhat-keystore@3.0.3(hardhat@3.1.5)':
     dependencies:
       '@noble/ciphers': 1.2.1
       '@noble/hashes': 1.7.1
       '@nomicfoundation/hardhat-errors': 3.0.6
-      '@nomicfoundation/hardhat-utils': 3.0.5
+      '@nomicfoundation/hardhat-utils': 3.0.6
       '@nomicfoundation/hardhat-zod-utils': 3.0.1(zod@3.25.76)
       chalk: 5.6.2
       debug: 4.4.3
-      hardhat: 3.1.3
+      hardhat: 3.1.5
       zod: 3.25.76
     transitivePeerDependencies:
       - supports-color
 
-  '@nomicfoundation/hardhat-network-helpers@3.0.3(hardhat@3.1.3)':
+  '@nomicfoundation/hardhat-network-helpers@3.0.3(hardhat@3.1.5)':
     dependencies:
       '@nomicfoundation/hardhat-errors': 3.0.6
-      '@nomicfoundation/hardhat-utils': 3.0.5
-      hardhat: 3.1.3
+      '@nomicfoundation/hardhat-utils': 3.0.6
+      hardhat: 3.1.5
     transitivePeerDependencies:
       - supports-color
 
@@ -1201,33 +1199,33 @@ snapshots:
       chalk: 5.6.2
       jest-diff: 29.7.0
 
-  '@nomicfoundation/hardhat-node-test-runner@3.0.8(hardhat@3.1.3)':
+  '@nomicfoundation/hardhat-node-test-runner@3.0.8(hardhat@3.1.5)':
     dependencies:
       '@nomicfoundation/hardhat-errors': 3.0.6
       '@nomicfoundation/hardhat-node-test-reporter': 3.0.2
-      '@nomicfoundation/hardhat-utils': 3.0.5
+      '@nomicfoundation/hardhat-utils': 3.0.6
       '@nomicfoundation/hardhat-zod-utils': 3.0.1(zod@3.25.76)
-      hardhat: 3.1.3
+      hardhat: 3.1.5
       tsx: 4.21.0
       zod: 3.25.76
     transitivePeerDependencies:
       - supports-color
 
-  '@nomicfoundation/hardhat-toolbox-viem@5.0.1(ee04c79a54149f52c904e88435f23381)':
+  '@nomicfoundation/hardhat-toolbox-viem@5.0.2(85231a14a7286b62004b8ecfc48ca681)':
     dependencies:
-      '@nomicfoundation/hardhat-ignition': 3.0.6(@nomicfoundation/hardhat-verify@3.0.8(hardhat@3.1.3))(hardhat@3.1.3)
-      '@nomicfoundation/hardhat-ignition-viem': 3.0.6(@nomicfoundation/hardhat-ignition@3.0.6(@nomicfoundation/hardhat-verify@3.0.8(hardhat@3.1.3))(hardhat@3.1.3))(@nomicfoundation/hardhat-verify@3.0.8(hardhat@3.1.3))(@nomicfoundation/hardhat-viem@3.0.1(hardhat@3.1.3)(viem@2.44.1(typescript@5.8.3)(zod@3.25.76)))(@nomicfoundation/ignition-core@3.0.6)(hardhat@3.1.3)(viem@2.44.1(typescript@5.8.3)(zod@3.25.76))
-      '@nomicfoundation/hardhat-keystore': 3.0.3(hardhat@3.1.3)
-      '@nomicfoundation/hardhat-network-helpers': 3.0.3(hardhat@3.1.3)
-      '@nomicfoundation/hardhat-node-test-runner': 3.0.8(hardhat@3.1.3)
-      '@nomicfoundation/hardhat-verify': 3.0.8(hardhat@3.1.3)
-      '@nomicfoundation/hardhat-viem': 3.0.1(hardhat@3.1.3)(viem@2.44.1(typescript@5.8.3)(zod@3.25.76))
-      '@nomicfoundation/hardhat-viem-assertions': 3.0.4(@nomicfoundation/hardhat-viem@3.0.1(hardhat@3.1.3)(viem@2.44.1(typescript@5.8.3)(zod@3.25.76)))(hardhat@3.1.3)(viem@2.44.1(typescript@5.8.3)(zod@3.25.76))
-      '@nomicfoundation/ignition-core': 3.0.6
-      hardhat: 3.1.3
-      viem: 2.44.1(typescript@5.8.3)(zod@3.25.76)
+      '@nomicfoundation/hardhat-ignition': 3.0.7(@nomicfoundation/hardhat-verify@3.0.8(hardhat@3.1.5))(hardhat@3.1.5)
+      '@nomicfoundation/hardhat-ignition-viem': 3.0.7(@nomicfoundation/hardhat-ignition@3.0.7(@nomicfoundation/hardhat-verify@3.0.8(hardhat@3.1.5))(hardhat@3.1.5))(@nomicfoundation/hardhat-verify@3.0.8(hardhat@3.1.5))(@nomicfoundation/hardhat-viem@3.0.2(hardhat@3.1.5)(viem@2.45.1(typescript@5.8.3)(zod@3.25.76)))(@nomicfoundation/ignition-core@3.0.7)(hardhat@3.1.5)(viem@2.45.1(typescript@5.8.3)(zod@3.25.76))
+      '@nomicfoundation/hardhat-keystore': 3.0.3(hardhat@3.1.5)
+      '@nomicfoundation/hardhat-network-helpers': 3.0.3(hardhat@3.1.5)
+      '@nomicfoundation/hardhat-node-test-runner': 3.0.8(hardhat@3.1.5)
+      '@nomicfoundation/hardhat-verify': 3.0.8(hardhat@3.1.5)
+      '@nomicfoundation/hardhat-viem': 3.0.2(hardhat@3.1.5)(viem@2.45.1(typescript@5.8.3)(zod@3.25.76))
+      '@nomicfoundation/hardhat-viem-assertions': 3.0.5(@nomicfoundation/hardhat-viem@3.0.2(hardhat@3.1.5)(viem@2.45.1(typescript@5.8.3)(zod@3.25.76)))(hardhat@3.1.5)(viem@2.45.1(typescript@5.8.3)(zod@3.25.76))
+      '@nomicfoundation/ignition-core': 3.0.7
+      hardhat: 3.1.5
+      viem: 2.45.1(typescript@5.8.3)(zod@3.25.76)
 
-  '@nomicfoundation/hardhat-utils@3.0.5':
+  '@nomicfoundation/hardhat-utils@3.0.6':
     dependencies:
       '@streamparser/json-node': 0.0.22
       debug: 4.4.3
@@ -1240,53 +1238,55 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@nomicfoundation/hardhat-verify@3.0.8(hardhat@3.1.3)':
+  '@nomicfoundation/hardhat-vendored@3.0.0': {}
+
+  '@nomicfoundation/hardhat-verify@3.0.8(hardhat@3.1.5)':
     dependencies:
       '@ethersproject/abi': 5.8.0
       '@nomicfoundation/hardhat-errors': 3.0.6
-      '@nomicfoundation/hardhat-utils': 3.0.5
+      '@nomicfoundation/hardhat-utils': 3.0.6
       '@nomicfoundation/hardhat-zod-utils': 3.0.1(zod@3.25.76)
       cbor2: 1.12.0
       chalk: 5.6.2
       debug: 4.4.3
-      hardhat: 3.1.3
+      hardhat: 3.1.5
       semver: 7.7.3
       zod: 3.25.76
     transitivePeerDependencies:
       - supports-color
 
-  '@nomicfoundation/hardhat-viem-assertions@3.0.4(@nomicfoundation/hardhat-viem@3.0.1(hardhat@3.1.3)(viem@2.44.1(typescript@5.8.3)(zod@3.25.76)))(hardhat@3.1.3)(viem@2.44.1(typescript@5.8.3)(zod@3.25.76))':
+  '@nomicfoundation/hardhat-viem-assertions@3.0.5(@nomicfoundation/hardhat-viem@3.0.2(hardhat@3.1.5)(viem@2.45.1(typescript@5.8.3)(zod@3.25.76)))(hardhat@3.1.5)(viem@2.45.1(typescript@5.8.3)(zod@3.25.76))':
     dependencies:
       '@nomicfoundation/hardhat-errors': 3.0.6
-      '@nomicfoundation/hardhat-utils': 3.0.5
-      '@nomicfoundation/hardhat-viem': 3.0.1(hardhat@3.1.3)(viem@2.44.1(typescript@5.8.3)(zod@3.25.76))
-      hardhat: 3.1.3
-      viem: 2.44.1(typescript@5.8.3)(zod@3.25.76)
+      '@nomicfoundation/hardhat-utils': 3.0.6
+      '@nomicfoundation/hardhat-viem': 3.0.2(hardhat@3.1.5)(viem@2.45.1(typescript@5.8.3)(zod@3.25.76))
+      hardhat: 3.1.5
+      viem: 2.45.1(typescript@5.8.3)(zod@3.25.76)
     transitivePeerDependencies:
       - supports-color
 
-  '@nomicfoundation/hardhat-viem@3.0.1(hardhat@3.1.3)(viem@2.44.1(typescript@5.8.3)(zod@3.25.76))':
+  '@nomicfoundation/hardhat-viem@3.0.2(hardhat@3.1.5)(viem@2.45.1(typescript@5.8.3)(zod@3.25.76))':
     dependencies:
       '@nomicfoundation/hardhat-errors': 3.0.6
-      '@nomicfoundation/hardhat-utils': 3.0.5
-      hardhat: 3.1.3
-      viem: 2.44.1(typescript@5.8.3)(zod@3.25.76)
+      '@nomicfoundation/hardhat-utils': 3.0.6
+      hardhat: 3.1.5
+      viem: 2.45.1(typescript@5.8.3)(zod@3.25.76)
     transitivePeerDependencies:
       - supports-color
 
   '@nomicfoundation/hardhat-zod-utils@3.0.1(zod@3.25.76)':
     dependencies:
       '@nomicfoundation/hardhat-errors': 3.0.6
-      '@nomicfoundation/hardhat-utils': 3.0.5
+      '@nomicfoundation/hardhat-utils': 3.0.6
       zod: 3.25.76
     transitivePeerDependencies:
       - supports-color
 
-  '@nomicfoundation/ignition-core@3.0.6':
+  '@nomicfoundation/ignition-core@3.0.7':
     dependencies:
       '@ethersproject/address': 5.6.1
       '@nomicfoundation/hardhat-errors': 3.0.6
-      '@nomicfoundation/hardhat-utils': 3.0.5
+      '@nomicfoundation/hardhat-utils': 3.0.6
       '@nomicfoundation/solidity-analyzer': 0.1.2
       cbor2: 1.12.0
       debug: 4.4.3
@@ -1299,7 +1299,7 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@nomicfoundation/ignition-ui@3.0.6': {}
+  '@nomicfoundation/ignition-ui@3.0.7': {}
 
   '@nomicfoundation/solidity-analyzer-darwin-arm64@0.1.2':
     optional: true
@@ -1331,6 +1331,8 @@ snapshots:
       '@nomicfoundation/solidity-analyzer-linux-x64-gnu': 0.1.2
       '@nomicfoundation/solidity-analyzer-linux-x64-musl': 0.1.2
       '@nomicfoundation/solidity-analyzer-win32-x64-msvc': 0.1.2
+
+  '@openzeppelin/contracts@5.4.0': {}
 
   '@scure/base@1.1.9': {}
 
@@ -1368,7 +1370,7 @@ snapshots:
 
   '@streamparser/json@0.0.22': {}
 
-  '@types/node@22.19.5':
+  '@types/node@22.19.7':
     dependencies:
       undici-types: 6.21.0
 
@@ -1501,15 +1503,16 @@ snapshots:
   fsevents@2.3.3:
     optional: true
 
-  get-tsconfig@4.13.0:
+  get-tsconfig@4.13.1:
     dependencies:
       resolve-pkg-maps: 1.0.0
 
-  hardhat@3.1.3:
+  hardhat@3.1.5:
     dependencies:
       '@nomicfoundation/edr': 0.12.0-next.22
       '@nomicfoundation/hardhat-errors': 3.0.6
-      '@nomicfoundation/hardhat-utils': 3.0.5
+      '@nomicfoundation/hardhat-utils': 3.0.6
+      '@nomicfoundation/hardhat-vendored': 3.0.0
       '@nomicfoundation/hardhat-zod-utils': 3.0.1(zod@3.25.76)
       '@nomicfoundation/solidity-analyzer': 0.1.2
       '@sentry/core': 9.47.1
@@ -1524,7 +1527,7 @@ snapshots:
       resolve.exports: 2.0.3
       semver: 7.7.3
       tsx: 4.21.0
-      ws: 8.19.0
+      ws: 8.18.3
       zod: 3.25.76
     transitivePeerDependencies:
       - bufferutil
@@ -1576,7 +1579,7 @@ snapshots:
   micro-eth-signer@0.14.0:
     dependencies:
       '@noble/curves': 1.8.2
-      '@noble/hashes': 1.7.2
+      '@noble/hashes': 1.7.1
       micro-packed: 0.7.3
 
   micro-packed@0.7.3:
@@ -1674,7 +1677,7 @@ snapshots:
   tsx@4.21.0:
     dependencies:
       esbuild: 0.27.2
-      get-tsconfig: 4.13.0
+      get-tsconfig: 4.13.1
     optionalDependencies:
       fsevents: 2.3.3
 
@@ -1694,7 +1697,7 @@ snapshots:
 
   util-deprecate@1.0.2: {}
 
-  viem@2.44.1(typescript@5.8.3)(zod@3.25.76):
+  viem@2.45.1(typescript@5.8.3)(zod@3.25.76):
     dependencies:
       '@noble/curves': 1.9.1
       '@noble/hashes': 1.8.0
@@ -1714,7 +1717,5 @@ snapshots:
   ws@8.17.1: {}
 
   ws@8.18.3: {}
-
-  ws@8.19.0: {}
 
   zod@3.25.76: {}

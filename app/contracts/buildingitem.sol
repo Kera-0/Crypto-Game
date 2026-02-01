@@ -34,6 +34,7 @@ contract BuildingItem is Ownable {
     }
     
     function transferForMarketplace(address from, address to, uint256 tokenId) external onlyMarketplace {
+        require(buildingToOwner[tokenId] == from);
         ownerBuildingCount[to]++;
         ownerBuildingCount[from]--;
         buildingToOwner[tokenId] = to;

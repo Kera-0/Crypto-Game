@@ -10,23 +10,8 @@ contract BuildingFactory is BuildingItem {
     uint64 constant LOOK_BITS_MASK = (uint64(1) << 50) - 1;
     uint32 constant COOLDOWN = 4 hours;    // TODO создать словарь для кажджого типа зданий с разным cooldown
     
-    uint16 private constant VALID_COUNT = 155;
-    uint16[VALID_COUNT] private VALID_MASKS = [
-            0x007, 0x00B, 0x00F, 0x013, 0x016, 0x017, 0x019, 0x01A, 0x01B, 0x01E, 0x01F, 0x026,
-            0x027, 0x02F, 0x032, 0x033, 0x034, 0x036, 0x037, 0x038, 0x039, 0x03A, 0x03B, 0x03C,
-            0x03D, 0x03E, 0x03F, 0x049, 0x04B, 0x04F, 0x058, 0x059, 0x05A, 0x05B, 0x05E, 0x05F,
-            0x06F, 0x078, 0x079, 0x07A, 0x07B, 0x07C, 0x07D, 0x07E, 0x092, 0x093, 0x096, 0x097,
-            0x098, 0x099, 0x09A, 0x09B, 0x09E, 0x09F, 0x0B0, 0x0B2, 0x0B3, 0x0B4, 0x0B6, 0x0B7,
-            0x0B8, 0x0B9, 0x0BA, 0x0BB, 0x0BC, 0x0BD, 0x0BE, 0x0BF, 0x0C8, 0x0C9, 0x0CB, 0x0CF,
-            0x0D8, 0x0D9, 0x0DA, 0x0DB, 0x0DE, 0x0DF, 0x0E4, 0x0E6, 0x0E7, 0x0EC, 0x0ED, 0x0EE,
-            0x0F0, 0x0F1, 0x0F2, 0x0F3, 0x0F4, 0x0F6, 0x0F7, 0x0F8, 0x0F9, 0x0FA, 0x0FB, 0x0FC,
-            0x0FD, 0x0FE, 0x0FF, 0x124, 0x126, 0x127, 0x12C, 0x12D, 0x12E, 0x130, 0x131, 0x132, 0x133,
-            0x134, 0x136, 0x137, 0x138, 0x139, 0x13A, 0x13B, 0x13C, 0x13D, 0x13E, 0x164, 0x166, 0x167,
-            0x16C, 0x16D, 0x16E, 0x170, 0x171, 0x172, 0x173, 0x174, 0x176, 0x178, 0x179, 0x17A, 0x17C,
-            0x17E, 0x18F, 0x192, 0x193, 0x196, 0x197, 0x19A, 0x19B, 0x19E, 0x1B0, 0x1B2, 0x1B3, 0x1B4,
-            0x1B6, 0x1B8, 0x1B9, 0x1BA, 0x1BC, 0x1C0, 0x1C8, 0x1C9, 0x1CB, 0x1D0, 0x1D2, 0x1D3, 0x1D6,
-            0x1D8, 0x1D9, 0x1DA, 0x1E0, 0x1E4, 0x1E6, 0x1E8, 0x1E9, 0x1EC, 0x1F0, 0x1F2, 0x1F4, 0x1F8
-    ];
+    uint16 private constant VALID_COUNT = 174;
+    bytes private constant VALID_MASKS_PACKED = hex"0007000b000f0013001600170019001a001b001e001f00260027002f0032003300340036003700380039003a003b003c003d003e003f0049004b004f00580059005a005b005e005f006f00780079007a007b007c007d007e009200930096009700980099009a009b009e009f00b000b200b300b400b600b700b800b900ba00bb00bc00bd00be00bf00c800c900cb00cf00d800d900da00db00de00df00e400e600e700ec00ed00ee00f000f100f200f300f400f600f700f800f900fa00fb00fc00fd00fe00ff012401260127012c012d012e013001310132013301340136013701380139013a013b013c013d013e016401660167016c016d016e01700171017201730174017601780179017a017c017e018f0192019301960197019a019b019e01b001b201b301b401b601b801b901ba01bc01c001c801c901cb01d001d201d301d601d801d901da01e001e401e601e801e901ec01f001f201f401f8";
 
     uint256[32] mintPrice;
 
@@ -47,7 +32,8 @@ contract BuildingFactory is BuildingItem {
             uint64 look = uint64(rnd) & LOOK_BITS_MASK;
 
             uint64 dna = uint64(buildingType) | (uint64(shapeMask) << SHAPE_SHIFT) | (look << LOOK_SHIFT);
-            uint256 id = buildings.push(Building(dna, 1, uint32(block.timestamp + COOLDOWN), false)) - 1;    // Листинг на маркете или минт
+            buildings.push(Building(dna, 1, uint32(block.timestamp + COOLDOWN), false)); // Листинг на маркете или минт
+            uint256 id = buildings.length - 1;
 
             buildingToOwner[id] = address(this);
             ownerBuildingCount[address(this)]++;
@@ -57,6 +43,15 @@ contract BuildingFactory is BuildingItem {
     }
 
     function _getValidShapeMask(uint256 seed) internal pure returns (uint16) {
-        return VALID_MASKS[seed % VALID_COUNT];
+        uint256 i = (seed % VALID_COUNT) * 2;
+        return (uint16(uint8(VALID_MASKS_PACKED[i])) << 8)
+            | uint16(uint8(VALID_MASKS_PACKED[i + 1]));
+    }
+
+    receive() external payable {}
+
+    function withdraw(address payable to) external onlyOwner {
+        (bool ok, ) = to.call{value: address(this).balance}("");
+        require(ok, "withdraw failed");
     }
 }
