@@ -35,8 +35,7 @@ contract BuildingFactory is BuildingItem {
             buildings.push(Building(dna, 1, uint32(block.timestamp + COOLDOWN), false)); // Листинг на маркете или минт
             uint256 id = buildings.length - 1;
 
-            buildingToOwner[id] = address(this);
-            ownerBuildingCount[address(this)]++;
+            _addBuildingToOwner(address(this), id);
 
             marketplace.list(id, mintPrice[buildingType]);
         }
