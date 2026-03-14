@@ -1,0 +1,281 @@
+pragma solidity ^0.8.28;
+
+import {BuildingFactory} from "./buildingsfactory.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+
+interface IGameToken {
+    function mint(address to, uint256 amount) external;
+    function burn(address from, uint256 amount) external;
+    function gameTransfer(address to, uint256 amount) external returns (bool);
+}
+
+contract CityFiled is BuildingFactory, ReentrancyGuard {
+    IGameToken public token;
+
+    constructor(address tokenAddress) {
+        token = IGameToken(tokenAddress);
+        cities.push();
+    }
+
+    struct City {
+        uint8 level;       
+        uint256[12][12][10] fields;
+        uint256 power;
+        uint256 defense;
+    }
+
+    struct BuildingPosition {
+        uint8 layer;
+        uint8 top;
+        uint8 left;
+    }
+
+    City[] public cities;
+
+    mapping (uint256 => address) public cityToOwner;
+    mapping (address => uint256) public ownerToCity; // can have only 1 city
+    mapping(uint256 => BuildingPosition) public buildingPosition;
+
+    uint256[32] levelUpPrice;
+
+    event LevelUpgraded(address indexed addr, uint8 level);
+
+    function createCity() external {
+        require(ownerToCity[msg.sender] == 0, "City already exists");
+
+        cities.push();
+        uint256 id = cities.length - 1;
+
+        cityToOwner[id] = msg.sender;
+        ownerToCity[msg.sender] = id;
+    }
+
+    function setLevelUpPrice(uint8 level, uint256 price) external onlyOwner() {
+        require(level <= 31);
+        require(price > 0);
+        levelUpPrice[level] = price;
+    }
+
+    function getMoney() external {
+        uint256[] storage ids = ownerToBuildingIds[msg.sender];
+        uint256 payout = 0;
+        uint256 time = block.timestamp;
+
+        for (uint256 i = 0; i < ids.length; i++) {
+            Building storage b = buildings[ids[i]];
+
+            if (b.isActive && _getBuildingType(b.dna) == 0 && time >= b.updateReadyTime) {
+                payout += 100 * b.level;
+                b.updateReadyTime = uint256(time + 4 hours);
+            }
+        }
+
+        if (payout > 0) {
+            token.gameTransfer(msg.sender, payout);
+        }
+    }
+
+    function putBuilding(uint8 layer, uint8 top, uint8 left, uint256 buildingId) external {
+        require(buildingId != 0, "Invalid building id");
+        require(buildingToOwner[buildingId] == msg.sender, "Not building owner");
+
+        uint256 cityId = ownerToCity[msg.sender];
+        require(cityId != 0, "No city");
+
+        City storage city = cities[cityId];
+        Building storage building = buildings[buildingId];
+
+        require(!building.isActive, "Building already placed");
+
+        _checkPlacement(city, building.dna, layer, top, left);
+        _placeBuilding(city, buildingId, building.dna, layer, top, left);
+
+        building.isActive = true;
+        buildingPosition[buildingId] = BuildingPosition(layer, top, left);
+    }
+
+    function moveBuilding(uint8 newLayer, uint8 newTop, uint8 newLeft, uint256 buildingId) external {
+        require(buildingId != 0, "Invalid building id");
+        require(buildingToOwner[buildingId] == msg.sender, "Not building owner");
+
+        uint256 cityId = ownerToCity[msg.sender];
+        require(cityId != 0, "No city");
+
+        City storage city = cities[cityId];
+        Building storage building = buildings[buildingId];
+
+        require(building.isActive, "Building is not placed");
+
+        BuildingPosition memory oldPos = buildingPosition[buildingId];
+
+        _clearBuilding(city, buildingId, building.dna, oldPos.layer, oldPos.top, oldPos.left);
+        _checkPlacement(city, building.dna, newLayer, newTop, newLeft);
+        _placeBuilding(city, buildingId, building.dna, newLayer, newTop, newLeft);
+
+        buildingPosition[buildingId] = BuildingPosition(newLayer, newTop, newLeft);
+    }
+
+    function removeBuilding(uint256 buildingId) external {
+        require(buildingId != 0, "Invalid building id");
+        require(buildingToOwner[buildingId] == msg.sender, "Not building owner");
+
+        uint256 cityId = ownerToCity[msg.sender];
+        require(cityId != 0, "No city");
+
+        City storage city = cities[cityId];
+        Building storage building = buildings[buildingId];
+
+        require(building.isActive, "Building is not placed");
+
+        BuildingPosition memory pos = buildingPosition[buildingId];
+
+        _clearBuilding(city, buildingId, building.dna, pos.layer, pos.top, pos.left);
+
+        building.isActive = false;
+        delete buildingPosition[buildingId];
+    }
+
+    function canPlaceBuilding(
+        address owner,
+        uint8 layer,
+        uint8 top,
+        uint8 left,
+        uint256 buildingId
+    ) external view returns (bool) {
+        if (buildingId == 0) return false;
+        if (buildingToOwner[buildingId] != owner) return false;
+
+        uint256 cityId = ownerToCity[owner];
+        if (cityId == 0) return false;
+
+        City storage city = cities[cityId];
+        Building storage building = buildings[buildingId];
+
+        if (layer > city.level) return false;
+        if (top + 2 >= city.fields[layer].length) return false;
+        if (left + 2 >= city.fields[layer][top].length) return false;
+
+        uint16 mask = _getBuildingShapeMask(building.dna);
+        if (mask == 0) return false;
+
+        for (uint8 r = 0; r < 3; r++) {
+            for (uint8 c = 0; c < 3; c++) {
+                if (_hasShapeBit(mask, r, c)) {
+                    if (city.fields[layer][top + r][left + c] != 0) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    function _checkPlacement(
+        City storage city,
+        uint64 dna,
+        uint8 layer,
+        uint8 top,
+        uint8 left
+    ) internal view {
+        require(layer <= city.level, "Invalid layer");
+        require(top + 2 < city.fields[layer].length, "Out of bounds");
+        require(left + 2 < city.fields[layer][top].length, "Out of bounds");
+
+        uint16 mask = _getBuildingShapeMask(dna);
+        require(mask != 0, "Empty building shape");
+
+        for (uint8 r = 0; r < 3; r++) {
+            for (uint8 c = 0; c < 3; c++) {
+                if (_hasShapeBit(mask, r, c)) {
+                    require(city.fields[layer][top + r][left + c] == 0, "Collision");
+                }
+            }
+        }
+    }
+
+    function _placeBuilding(
+        City storage city,
+        uint256 buildingId,
+        uint64 dna,
+        uint8 layer,
+        uint8 top,
+        uint8 left
+    ) internal {
+        uint16 mask = _getBuildingShapeMask(dna);
+
+        for (uint8 r = 0; r < 3; r++) {
+            for (uint8 c = 0; c < 3; c++) {
+                if (_hasShapeBit(mask, r, c)) {
+                    city.fields[layer][top + r][left + c] = buildingId;
+                }
+            }
+        }
+    }
+
+    function _clearBuilding(
+        City storage city,
+        uint256 buildingId,
+        uint64 dna,
+        uint8 layer,
+        uint8 top,
+        uint8 left
+    ) internal {
+        uint16 mask = _getBuildingShapeMask(dna);
+
+        for (uint8 r = 0; r < 3; r++) {
+            for (uint8 c = 0; c < 3; c++) {
+                if (_hasShapeBit(mask, r, c)) {
+                    if (city.fields[layer][top + r][left + c] == buildingId) {
+                        city.fields[layer][top + r][left + c] = 0;
+                    }
+                }
+            }
+        }
+    }
+
+    function getPower() external {
+        uint256[] storage ids = ownerToBuildingIds[msg.sender];
+        uint256 power = 0;
+        uint256 time = block.timestamp;
+
+        for (uint256 i = 0; i < ids.length; i++) {
+            Building storage b = buildings[ids[i]];
+
+            if (b.isActive && _getBuildingType(b.dna) == 1 && time >= b.updateReadyTime) {
+                power += 100 * b.level;
+                b.updateReadyTime = uint256(time + 4 hours);
+            }
+        }
+
+        if (power > 0) {
+            City storage city = cities[ownerToCity[msg.sender]];
+            city.power += power;
+        }
+    }
+
+    function upgradeLevel() external payable nonReentrant {
+        uint256 cityId = ownerToCity[msg.sender];
+        City storage city = cities[cityId];
+
+        require(city.level <= 10, "max level");
+        require(msg.value == levelUpPrice[city.level], "wrong value");
+
+        city.level += 1;
+        emit LevelUpgraded(msg.sender, city.level);
+    }
+
+    function getCell(address owner, uint8 layer, uint8 i, uint8 j) external view returns (uint256) {
+        uint256 cityId = ownerToCity[owner];
+        require(cityId != 0, "No city");
+        return cities[cityId].fields[layer][i][j];
+    }
+
+    function getCityStats(address owner) external view returns (uint8 level, uint256 power, uint256 defense) {
+        uint256 cityId = ownerToCity[owner];
+        require(cityId != 0, "No city");
+        City storage c = cities[cityId];
+        return (c.level, c.power, c.defense);
+    }
+}
