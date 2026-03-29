@@ -1,5 +1,14 @@
-export const CITY_ADDRESS = '0xe7f1725e7734ce288f8367e1bb143e90bb3f0512' as `0x${string}`
-export const TOKEN_ADDRESS = '0x5fbdb2315678afecb367f032d93f642f64180aa3' as `0x${string}`
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const
+
+export const CITY_ADDRESS = (process.env.NEXT_PUBLIC_CITY_ADDRESS ?? '0xe7f1725e7734ce288f8367e1bb143e90bb3f0512') as `0x${string}`
+export const TOKEN_ADDRESS = (process.env.NEXT_PUBLIC_TOKEN_ADDRESS ?? '0x5fbdb2315678afecb367f032d93f642f64180aa3') as `0x${string}`
+export const HERO_CURRENCY_ADDRESS = (process.env.NEXT_PUBLIC_HERO_CURRENCY_ADDRESS ?? ZERO_ADDRESS) as `0x${string}`
+export const HERO_NFT_ADDRESS = (process.env.NEXT_PUBLIC_HERO_NFT_ADDRESS ?? ZERO_ADDRESS) as `0x${string}`
+export const PACK_OPENER_ADDRESS = (process.env.NEXT_PUBLIC_PACK_OPENER_ADDRESS ?? ZERO_ADDRESS) as `0x${string}`
+
+export function isConfiguredAddress(address: `0x${string}`) {
+  return /^0x[a-fA-F0-9]{40}$/.test(address) && address.toLowerCase() !== ZERO_ADDRESS
+}
 
 export const cityAbi = [
   {
@@ -157,6 +166,13 @@ export const cityAbi = [
     ],
     outputs: [{ name: '', type: 'uint256' }],
   },
+  {
+    type: 'function',
+    name: 'claimStarterBuildings',
+    stateMutability: 'nonpayable',
+    inputs: [],
+    outputs: [],
+  },
 ] as const
 
 export const tokenAbi = [
@@ -166,5 +182,138 @@ export const tokenAbi = [
     stateMutability: 'view',
     inputs: [{ name: 'account', type: 'address' }],
     outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'faucet',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'amount', type: 'uint256' }],
+    outputs: [],
+  },
+] as const
+
+export const heroNftAbi = [
+  {
+    type: 'function',
+    name: 'nextId',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'balanceOf',
+    stateMutability: 'view',
+    inputs: [{ name: 'owner', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'ownerOf',
+    stateMutability: 'view',
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    outputs: [{ name: '', type: 'address' }],
+  },
+  {
+    type: 'function',
+    name: 'hero',
+    stateMutability: 'view',
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    outputs: [
+      {
+        name: '',
+        type: 'tuple',
+        components: [
+          { name: 'rarity', type: 'uint8' },
+          {
+            name: 'base',
+            type: 'tuple',
+            components: [
+              { name: 'atk', type: 'uint16' },
+              { name: 'def_', type: 'uint16' },
+              { name: 'hp', type: 'uint16' },
+              { name: 'agi', type: 'uint16' },
+              { name: 'lck', type: 'uint16' },
+            ],
+          },
+          {
+            name: 'bonus',
+            type: 'tuple',
+            components: [
+              { name: 'atk', type: 'uint16' },
+              { name: 'def_', type: 'uint16' },
+              { name: 'hp', type: 'uint16' },
+              { name: 'agi', type: 'uint16' },
+              { name: 'lck', type: 'uint16' },
+            ],
+          },
+          {
+            name: 'prog',
+            type: 'tuple',
+            components: [
+              { name: 'level', type: 'uint16' },
+              { name: 'xp', type: 'uint32' },
+              { name: 'upgradesThisLevel', type: 'uint8' },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'totalStats',
+    stateMutability: 'view',
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    outputs: [
+      {
+        name: '',
+        type: 'tuple',
+        components: [
+          { name: 'atk', type: 'uint16' },
+          { name: 'def_', type: 'uint16' },
+          { name: 'hp', type: 'uint16' },
+          { name: 'agi', type: 'uint16' },
+          { name: 'lck', type: 'uint16' },
+        ],
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'applyModule',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'tokenId', type: 'uint256' },
+      { name: 'm', type: 'uint8' },
+    ],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'enterTournament',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'tokenId', type: 'uint256' },
+      { name: 'tournamentId', type: 'bytes32' },
+    ],
+    outputs: [],
+  },
+] as const
+
+export const packOpenerAbi = [
+  {
+    type: 'function',
+    name: 'packPrice',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'buyPack',
+    stateMutability: 'nonpayable',
+    inputs: [],
+    outputs: [{ name: 'requestId', type: 'uint256' }],
   },
 ] as const
