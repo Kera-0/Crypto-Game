@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { formatEther, parseEther } from 'viem'
 import { useAccount, usePublicClient, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
-import { parseEther, formatEther } from 'viem'
-import { CITY_ADDRESS, TOKEN_ADDRESS, cityAbi, tokenAbi } from '@/lib/contracts'
 import { Navbar } from '@/components/navbar'
+import { CITY_ADDRESS, TOKEN_ADDRESS, cityAbi, tokenAbi } from '@/lib/contracts'
 
 type Cell = {
   row: number
@@ -57,12 +57,12 @@ export default function Page() {
     },
   })
 
-  async function refreshOwnedIds() {
+  const refreshOwnedIds = useCallback(async () => {
     if (!publicClient || !address) return
 
     const result: bigint[] = []
 
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 100; i += 1) {
       try {
         const id = (await publicClient.readContract({
           address: CITY_ADDRESS,
@@ -78,9 +78,9 @@ export default function Page() {
     }
 
     setOwnedIds(result.filter((x) => x !== BigInt(0)))
-  }
+  }, [address, publicClient])
 
-  async function loadGrid() {
+  const loadGrid = useCallback(async () => {
     if (!publicClient || !address || !cityId || cityId === BigInt(0)) {
       setGrid([])
       return
@@ -111,12 +111,12 @@ export default function Page() {
     } finally {
       setLoadingGrid(false)
     }
-  }
+  }, [address, cityId, publicClient, selectedLayer])
 
   useEffect(() => {
     loadGrid()
     refreshOwnedIds()
-  }, [address, cityId, selectedLayer])
+  }, [loadGrid, refreshOwnedIds])
 
   async function createCity() {
     const tx = await writeContractAsync({
@@ -130,6 +130,17 @@ export default function Page() {
       refetchCityId()
       loadGrid()
     }, 1500)
+  }
+
+  async function claimStarterBuildings() {
+    const tx = await writeContractAsync({
+      address: CITY_ADDRESS,
+      abi: cityAbi,
+      functionName: 'claimStarterBuildings',
+      args: [],
+    })
+    setHash(tx)
+    setTimeout(refreshOwnedIds, 1500)
   }
 
   async function putBuilding() {
@@ -212,14 +223,14 @@ export default function Page() {
 
       {!isConnected && (
         <div style={{ padding: 16, border: '1px solid #334155', borderRadius: 12, background: '#111827' }}>
-          Подключи кошелёк, чтобы создать город и взаимодействовать с контрактом.
+          Подключи кошелек, чтобы создать город и взаимодействовать с контрактом.
         </div>
       )}
 
       {isConnected && (
         <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: 24 }}>
           <section style={{ background: '#111827', border: '1px solid #334155', borderRadius: 16, padding: 16 }}>
-            <h2 style={{ marginTop: 0 }}>Панель</h2>
+            <h2 style={{ marginTop: 0 }}>Панель города</h2>
             <div style={{ marginBottom: 8 }}>Адрес: {short(address)}</div>
             <div style={{ marginBottom: 8 }}>City ID: {cityId?.toString() ?? '—'}</div>
             <div style={{ marginBottom: 16 }}>Баланс токена: {tokenBalance ? formatEther(tokenBalance) : '0'}</div>
@@ -227,6 +238,11 @@ export default function Page() {
             <button onClick={createCity} disabled={txPending} style={btn}>
               Создать город
             </button>
+
+            <div style={block}>
+              <label>Стартовый набор</label>
+              <button onClick={claimStarterBuildings} disabled={txPending} style={btnAlt}>claimStarterBuildings</button>
+            </div>
 
             <div style={block}>
               <label>Слой</label>
@@ -274,10 +290,14 @@ export default function Page() {
               <label>Твои buildingIds</label>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {ownedIds.map((id) => (
-                  <button key={id.toString()} style={chip} onClick={() => {
-                    setSelectedBuildingId(id.toString())
-                    setMoveBuildingId(id.toString())
-                  }}>
+                  <button
+                    key={id.toString()}
+                    style={chip}
+                    onClick={() => {
+                      setSelectedBuildingId(id.toString())
+                      setMoveBuildingId(id.toString())
+                    }}
+                  >
                     #{id.toString()}
                   </button>
                 ))}
@@ -321,7 +341,7 @@ export default function Page() {
               })}
             </div>
 
-            {loadingGrid && <div style={{ marginTop: 12 }}>Загружаю поле…</div>}
+            {loadingGrid && <div style={{ marginTop: 12 }}>Загружаю поле...</div>}
           </section>
         </div>
       )}

@@ -1,5 +1,7 @@
 "use client"
 
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { useAccount, useConnect, useDisconnect, useSwitchChain } from 'wagmi'
 
@@ -79,6 +81,7 @@ export function Navbar() {
   const { connect, connectors, isPending } = useConnect()
   const { disconnect } = useDisconnect()
   const { switchChain, chains } = useSwitchChain()
+  const pathname = usePathname()
 
   const connector = connectors[0]
   const currentChainLabel = chain?.name?.split(' ').slice(0, 2).join(' ') ?? 'Select network'
@@ -88,17 +91,38 @@ export function Navbar() {
       label: item.name,
       onClick: () => switchChain({ chainId: item.id }),
     }))
+  const navItems = [
+    { href: '/', label: 'Cities' },
+    { href: '/heroes', label: 'Heroes' },
+  ]
 
   return (
     <nav className="flex w-full items-center justify-between gap-4 py-3">
       <div className="flex items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#f97316,#fb923c_55%,#fdba74)] text-lg font-black text-white shadow-[0_18px_35px_rgba(249,115,22,0.35)]">
-          M
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#0f766e,#14b8a6_55%,#99f6e4)] text-lg font-black text-white shadow-[0_18px_35px_rgba(20,184,166,0.35)]">
+          C
         </div>
         <div>
-          <div className="text-xl font-black tracking-tight text-white">MetaMask City</div>
-          <div className="text-sm text-slate-400">Wallet controls</div>
+          <div className="text-xl font-black tracking-tight text-white">Crypto Game</div>
+          <div className="text-sm text-slate-400">Cities, heroes, wallet and network</div>
         </div>
+      </div>
+
+      <div className="hidden items-center gap-2 rounded-2xl border border-white/10 bg-white/5 p-1 md:flex">
+        {navItems.map((item) => {
+          const active = pathname === item.href
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-300 hover:bg-white/10 hover:text-white'
+              }`}
+            >
+              {item.label}
+            </Link>
+          )
+        })}
       </div>
 
       {isConnected ? (
