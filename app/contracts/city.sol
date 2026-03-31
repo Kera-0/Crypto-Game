@@ -22,7 +22,6 @@ contract CityFiled is BuildingFactory, ReentrancyGuard {
         uint8 level;       
         uint256[12][12][10] fields;
         uint256 power;
-        uint256 defense;
     }
 
     struct BuildingPosition {
@@ -40,6 +39,8 @@ contract CityFiled is BuildingFactory, ReentrancyGuard {
     uint256[32] levelUpPrice;
 
     event LevelUpgraded(address indexed addr, uint8 level);
+    event PowerGained(uint256 power);
+    event FieldChanged();
 
     function createCity() external {
         require(ownerToCity[msg.sender] == 0, "City already exists");
@@ -93,6 +94,8 @@ contract CityFiled is BuildingFactory, ReentrancyGuard {
 
         building.isActive = true;
         buildingPosition[buildingId] = BuildingPosition(layer, top, left);
+
+        emit FieldChanged();
     }
 
     function moveBuilding(uint8 newLayer, uint8 newTop, uint8 newLeft, uint256 buildingId) external {
@@ -134,6 +137,8 @@ contract CityFiled is BuildingFactory, ReentrancyGuard {
 
         building.isActive = false;
         delete buildingPosition[buildingId];
+
+        emit FieldChanged();
     }
 
     function canPlaceBuilding(
@@ -253,6 +258,8 @@ contract CityFiled is BuildingFactory, ReentrancyGuard {
             City storage city = cities[ownerToCity[msg.sender]];
             city.power += power;
         }
+
+        emit PowerGained(power);
     }
 
     function upgradeLevel() external payable nonReentrant {
@@ -272,10 +279,18 @@ contract CityFiled is BuildingFactory, ReentrancyGuard {
         return cities[cityId].fields[layer][i][j];
     }
 
-    function getCityStats(address owner) external view returns (uint8 level, uint256 power, uint256 defense) {
+    function getCityStats(address owner) external view returns (uint8 level, uint256 power) {
         uint256 cityId = ownerToCity[owner];
         require(cityId != 0, "No city");
         City storage c = cities[cityId];
-        return (c.level, c.power, c.defense);
+        return (c.level, c.power);
+    }
+
+    function getUpgradeLevelPrice() external view returns (uint256) {
+        uint256 cityId = ownerToCity[msg.sender];
+        City memory city = cities[cityId];
+        
+        uint8 cityLevel = city.level;
+        return levelUpPrice[cityLevel];
     }
 }

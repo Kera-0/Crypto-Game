@@ -39,6 +39,16 @@ export const cityAbi = [
   },
   {
     type: 'function',
+    name: 'getCityStats',
+    stateMutability: 'view',
+    inputs: [{ name: 'owner', type: 'address' }],
+    outputs: [
+      { name: 'level', type: 'uint8' },
+      { name: 'power', type: 'uint256' },
+    ],
+  },
+  {
+    type: 'function',
     name: 'canPlaceBuilding',
     stateMutability: 'view',
     inputs: [
@@ -101,6 +111,13 @@ export const cityAbi = [
     stateMutability: 'payable',
     inputs: [],
     outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'getUpgradeLevelPrice',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
   },
   {
     type: 'function',
@@ -172,6 +189,27 @@ export const cityAbi = [
     stateMutability: 'nonpayable',
     inputs: [],
     outputs: [],
+  },
+  {
+    type: 'event',
+    name: 'PowerGained',
+    anonymous: false,
+    inputs: [{ name: 'power', type: 'uint256', indexed: false }],
+  },
+  {
+    type: 'event',
+    name: 'FieldChanged',
+    anonymous: false,
+    inputs: [],
+  },
+  {
+    type: 'event',
+    name: 'LevelUpgraded',
+    anonymous: false,
+    inputs: [
+      { name: 'addr', type: 'address', indexed: true },
+      { name: 'level', type: 'uint8', indexed: false },
+    ],
   },
 ] as const
 

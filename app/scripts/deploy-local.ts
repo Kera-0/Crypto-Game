@@ -30,6 +30,27 @@ await deployer.writeContract({
 });
 
 await deployer.writeContract({
+  address: city.address,
+  abi: city.abi,
+  functionName: "setLevelUpPrice",
+  args: [0, parseEther("0.01")],
+});
+
+await deployer.writeContract({
+  address: city.address,
+  abi: city.abi,
+  functionName: "setLevelUpPrice",
+  args: [1, parseEther("0.02")],
+});
+
+await deployer.writeContract({
+  address: city.address,
+  abi: city.abi,
+  functionName: "setLevelUpPrice",
+  args: [2, parseEther("0.03")],
+});
+
+await deployer.writeContract({
   address: heroCurrency.address,
   abi: heroCurrency.abi,
   functionName: "setSpender",
