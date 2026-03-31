@@ -30,6 +30,13 @@ await deployer.writeContract({
 });
 
 await deployer.writeContract({
+  address: heroCurrency.address,
+  abi: heroCurrency.abi,
+  functionName: "setSpender",
+  args: [pack.address, true],
+});
+
+await deployer.writeContract({
   address: hero.address,
   abi: hero.abi,
   functionName: "setMinter",
