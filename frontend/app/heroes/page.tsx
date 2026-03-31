@@ -92,53 +92,47 @@ async function fetchOwnedHeroes(
   const maxId = Number(nextHeroId) - 1
   if (maxId <= 0) return []
 
-  const ownershipChecks = await publicClient.multicall({
-    contracts: Array.from({ length: maxId }, (_, index) => ({
-      address: HERO_NFT_ADDRESS,
-      abi: heroNftAbi,
-      functionName: 'ownerOf',
-      args: [BigInt(index + 1)],
-    })),
-    allowFailure: true,
-  })
+  const ownedIds: bigint[] = []
 
-  const ownedIds = ownershipChecks.flatMap((item, index) => {
-    if (item.status !== 'success') return []
-    return item.result.toLowerCase() === owner.toLowerCase() ? [BigInt(index + 1)] : []
-  })
+  for (let index = 1; index <= maxId; index += 1) {
+    try {
+      const tokenOwner = (await publicClient.readContract({
+        address: HERO_NFT_ADDRESS,
+        abi: heroNftAbi,
+        functionName: 'ownerOf',
+        args: [BigInt(index)],
+      })) as `0x${string}`
+
+      if (tokenOwner.toLowerCase() === owner.toLowerCase()) {
+        ownedIds.push(BigInt(index))
+      }
+    } catch {
+      continue
+    }
+  }
 
   if (!ownedIds.length) return []
 
-  const heroCalls = await publicClient.multicall({
-    contracts: ownedIds.flatMap((id) => [
-      {
+  const heroes: HeroCardData[] = []
+
+  for (const id of ownedIds) {
+    try {
+      const heroData = await publicClient.readContract({
         address: HERO_NFT_ADDRESS,
         abi: heroNftAbi,
         functionName: 'hero',
         args: [id],
-      },
-      {
+      })
+
+      const totalStats = await publicClient.readContract({
         address: HERO_NFT_ADDRESS,
         abi: heroNftAbi,
         functionName: 'totalStats',
         args: [id],
-      },
-    ]),
-  })
+      })
 
-  const heroes: HeroCardData[] = []
-
-  for (let index = 0; index < ownedIds.length; index += 1) {
-    const heroResult = heroCalls[index * 2]
-    const totalResult = heroCalls[index * 2 + 1]
-
-    if (heroResult.status !== 'success' || totalResult.status !== 'success') continue
-
-    const heroData = heroResult.result
-    const totalStats = totalResult.result
-
-    heroes.push({
-      id: ownedIds[index],
+      heroes.push({
+      id,
       rarity: Number(heroData.rarity),
       base: normalizeStats(heroData.base),
       bonus: normalizeStats(heroData.bonus),
@@ -146,7 +140,10 @@ async function fetchOwnedHeroes(
       level: Number(heroData.prog.level),
       xp: Number(heroData.prog.xp),
       upgradesThisLevel: Number(heroData.prog.upgradesThisLevel),
-    })
+      })
+    } catch {
+      continue
+    }
   }
 
   return heroes
