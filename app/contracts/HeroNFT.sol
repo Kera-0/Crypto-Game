@@ -32,6 +32,7 @@ contract HeroNFT is ERC721, Ownable {
     uint256 public nextId = 1;
 
     mapping(uint256 => HeroData) internal _hero;
+    mapping(address => uint256[]) private _heroIdsByOwner;
     mapping(address => bool) public isBattler;
     mapping(address => bool) public isMinter;
 
@@ -51,6 +52,14 @@ contract HeroNFT is ERC721, Ownable {
     error NotMinter();
 
     constructor(address owner_) ERC721("Game Hero", "HERO") Ownable(owner_) {}
+
+    function heroIdsOf(address owner) external view returns (uint256[] memory) {
+        return _heroIdsByOwner[owner];
+    }
+
+    function heroCountOf(address owner) external view returns (uint256) {
+        return _heroIdsByOwner[owner].length;
+    }
 
     function setBattler(address battler, bool allowed) external onlyOwner {
         isBattler[battler] = allowed;
@@ -81,6 +90,7 @@ contract HeroNFT is ERC721, Ownable {
 
         tokenId = nextId++;
         _safeMint(to, tokenId);
+        _heroIdsByOwner[to].push(tokenId);
 
         _hero[tokenId].rarity = rarity;
         _hero[tokenId].base = baseStats;

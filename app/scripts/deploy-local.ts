@@ -14,12 +14,20 @@ const city = await viem.deployContract("CityFiledLocal", [cityToken.address]);
 const heroCurrency = await viem.deployContract("InGameCurrencyLocal", [deployer.account.address]);
 const hero = await viem.deployContract("HeroNFT", [deployer.account.address]);
 const pack = await viem.deployContract("PackOpenerLocal", [heroCurrency.address, hero.address, parseEther("25")]);
+const pvp = await viem.deployContract("PvPBattlesTournament", [hero.address, city.address, cityToken.address, deployer.account.address]);
 
 await deployer.writeContract({
   address: cityToken.address,
   abi: cityToken.abi,
   functionName: "setGame",
   args: [city.address],
+});
+
+await deployer.writeContract({
+  address: cityToken.address,
+  abi: cityToken.abi,
+  functionName: "setPvpBattles",
+  args: [pvp.address],
 });
 
 await deployer.writeContract({
@@ -43,6 +51,13 @@ await deployer.writeContract({
   args: [pack.address, true],
 });
 
+await deployer.writeContract({
+  address: city.address,
+  abi: city.abi,
+  functionName: "setPvPBattles",
+  args: [pvp.address],
+});
+
 const blockNumber = await publicClient.getBlockNumber();
 const frontendEnv = [
   `NEXT_PUBLIC_CITY_ADDRESS=${city.address}`,
@@ -50,6 +65,7 @@ const frontendEnv = [
   `NEXT_PUBLIC_HERO_CURRENCY_ADDRESS=${heroCurrency.address}`,
   `NEXT_PUBLIC_HERO_NFT_ADDRESS=${hero.address}`,
   `NEXT_PUBLIC_PACK_OPENER_ADDRESS=${pack.address}`,
+  `NEXT_PUBLIC_PVP_BATTLES_ADDRESS=${pvp.address}`,
 ].join("\n");
 
 const rootEnv = [

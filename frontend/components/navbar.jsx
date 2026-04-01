@@ -94,6 +94,7 @@ export function Navbar() {
   const navItems = [
     { href: '/', label: 'Cities' },
     { href: '/heroes', label: 'Heroes' },
+    { href: '/pvp', label: 'PvP' },
   ]
 
   return (

@@ -5,12 +5,20 @@ export const TOKEN_ADDRESS = (process.env.NEXT_PUBLIC_TOKEN_ADDRESS ?? '0x5fbdb2
 export const HERO_CURRENCY_ADDRESS = (process.env.NEXT_PUBLIC_HERO_CURRENCY_ADDRESS ?? ZERO_ADDRESS) as `0x${string}`
 export const HERO_NFT_ADDRESS = (process.env.NEXT_PUBLIC_HERO_NFT_ADDRESS ?? ZERO_ADDRESS) as `0x${string}`
 export const PACK_OPENER_ADDRESS = (process.env.NEXT_PUBLIC_PACK_OPENER_ADDRESS ?? ZERO_ADDRESS) as `0x${string}`
+export const PVP_BATTLES_ADDRESS = (process.env.NEXT_PUBLIC_PVP_BATTLES_ADDRESS ?? ZERO_ADDRESS) as `0x${string}`
 
 export function isConfiguredAddress(address: `0x${string}`) {
   return /^0x[a-fA-F0-9]{40}$/.test(address) && address.toLowerCase() !== ZERO_ADDRESS
 }
 
 export const cityAbi = [
+  {
+    type: 'function',
+    name: 'MAP_SIZE',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
   {
     type: 'function',
     name: 'ownerToCity',
@@ -173,6 +181,34 @@ export const cityAbi = [
     inputs: [],
     outputs: [],
   },
+  {
+    type: 'function',
+    name: 'getCityCoord',
+    stateMutability: 'view',
+    inputs: [{ name: 'owner', type: 'address' }],
+    outputs: [
+      { name: 'x', type: 'uint32' },
+      { name: 'y', type: 'uint32' },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'getAllCityOwners',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: 'owners', type: 'address[]' }],
+  },
+  {
+    type: 'function',
+    name: 'getCityStats',
+    stateMutability: 'view',
+    inputs: [{ name: 'owner', type: 'address' }],
+    outputs: [
+      { name: 'level', type: 'uint8' },
+      { name: 'power', type: 'uint256' },
+      { name: 'defense', type: 'uint256' },
+    ],
+  },
 ] as const
 
 export const tokenAbi = [
@@ -193,6 +229,20 @@ export const tokenAbi = [
 ] as const
 
 export const heroNftAbi = [
+  {
+    type: 'function',
+    name: 'heroIdsOf',
+    stateMutability: 'view',
+    inputs: [{ name: 'owner', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256[]' }],
+  },
+  {
+    type: 'function',
+    name: 'heroCountOf',
+    stateMutability: 'view',
+    inputs: [{ name: 'owner', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
   {
     type: 'function',
     name: 'nextId',
@@ -315,5 +365,89 @@ export const packOpenerAbi = [
     stateMutability: 'nonpayable',
     inputs: [],
     outputs: [{ name: 'requestId', type: 'uint256' }],
+  },
+] as const
+
+export const pvpBattlesAbi = [
+  {
+    type: 'function',
+    name: 'attackerLockedUntil',
+    stateMutability: 'view',
+    inputs: [{ name: '', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'playerBattleIds',
+    stateMutability: 'view',
+    inputs: [{ name: 'player', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256[]' }],
+  },
+  {
+    type: 'function',
+    name: 'attack',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'defender', type: 'address' }],
+    outputs: [{ name: 'battleId', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'battles',
+    stateMutability: 'view',
+    inputs: [{ name: '', type: 'uint256' }],
+    outputs: [
+      { name: 'timestamp', type: 'uint64' },
+      { name: 'attacker', type: 'address' },
+      { name: 'defender', type: 'address' },
+      { name: 'winner', type: 'address' },
+      { name: 'loser', type: 'address' },
+      { name: 'rounds', type: 'uint256' },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'tournamentWins',
+    stateMutability: 'view',
+    inputs: [{ name: '', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'tournamentRoundStartedAt',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'tournamentPeriodSeconds',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'tournamentReward',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'finalizeTournament',
+    stateMutability: 'nonpayable',
+    inputs: [],
+    outputs: [],
+  },
+  {
+    type: 'event',
+    name: 'Attacked',
+    inputs: [
+      { name: 'battleId', type: 'uint256', indexed: true },
+      { name: 'attacker', type: 'address', indexed: true },
+      { name: 'defender', type: 'address', indexed: true },
+      { name: 'travelTimeSeconds', type: 'uint256', indexed: false },
+    ],
+    anonymous: false,
   },
 ] as const

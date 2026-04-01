@@ -5,11 +5,21 @@ import {Ownable} from "./Ownable.sol";
 
 contract GameToken is ERC20, Ownable {
     address public game;
+    address public pvpBattles;
 
     constructor(address initialOwner) ERC20("Game Gold", "YNGK") Ownable(initialOwner) {}
 
     function setGame(address gameAddress) external onlyOwner {
         game = gameAddress;
+    }
+
+    function setPvpBattles(address pvp) external onlyOwner {
+        pvpBattles = pvp;
+    }
+
+    function mintPvpReward(address to, uint256 amount) external {
+        require(msg.sender == pvpBattles && pvpBattles != address(0), "Only PvP");
+        _mint(to, amount);
     }
 
     modifier onlyGame() {

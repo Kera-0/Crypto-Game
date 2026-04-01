@@ -12,10 +12,16 @@ interface IGameToken {
 
 contract CityFiled is BuildingFactory, ReentrancyGuard {
     IGameToken public token;
+    address public pvpBattles;
+    uint256 public constant MAP_SIZE = 50;
 
     constructor(address tokenAddress) {
         token = IGameToken(tokenAddress);
         cities.push();
+    }
+
+    function setPvPBattles(address pvpBattles_) external onlyOwner() {
+        pvpBattles = pvpBattles_;
     }
 
     struct City {
@@ -23,6 +29,8 @@ contract CityFiled is BuildingFactory, ReentrancyGuard {
         uint256[12][12][10] fields;
         uint256 power;
         uint256 defense;
+        uint32 x;
+        uint32 y;
     }
 
     struct BuildingPosition {
@@ -40,6 +48,7 @@ contract CityFiled is BuildingFactory, ReentrancyGuard {
     uint256[32] levelUpPrice;
 
     event LevelUpgraded(address indexed addr, uint8 level);
+    event CityCreated(address indexed owner, uint256 indexed cityId, uint32 x, uint32 y);
 
     function createCity() external {
         require(ownerToCity[msg.sender] == 0, "City already exists");
@@ -49,6 +58,37 @@ contract CityFiled is BuildingFactory, ReentrancyGuard {
 
         cityToOwner[id] = msg.sender;
         ownerToCity[msg.sender] = id;
+
+        (uint32 x, uint32 y) = _rollCityCoord(msg.sender, id);
+        City storage c = cities[id];
+        c.x = x;
+        c.y = y;
+
+        emit CityCreated(msg.sender, id, x, y);
+    }
+
+    function getCityCoord(address owner) external view returns (uint32 x, uint32 y) {
+        uint256 cityId = ownerToCity[owner];
+        require(cityId != 0, "No city");
+        City storage c = cities[cityId];
+        return (c.x, c.y);
+    }
+
+    function _rollCityCoord(address owner, uint256 cityId) internal view returns (uint32 x, uint32 y) {
+        uint256 randomWord = uint256(
+            keccak256(
+                abi.encode(
+                    block.prevrandao,
+                    block.timestamp,
+                    block.number,
+                    owner,
+                    cityId
+                )
+            )
+        );
+
+        x = uint32(uint256(keccak256(abi.encode(randomWord, owner, "X"))) % MAP_SIZE);
+        y = uint32(uint256(keccak256(abi.encode(randomWord, owner, "Y"))) % MAP_SIZE);
     }
 
     function setLevelUpPrice(uint8 level, uint256 price) external onlyOwner() {
@@ -277,5 +317,35 @@ contract CityFiled is BuildingFactory, ReentrancyGuard {
         require(cityId != 0, "No city");
         City storage c = cities[cityId];
         return (c.level, c.power, c.defense);
+    }
+
+    function getAllCityOwners() external view returns (address[] memory owners) {
+        uint256 n = cities.length;
+        if (n <= 1) return new address[](0);
+
+        owners = new address[](n - 1);
+        for (uint256 i = 1; i < n; i++) {
+            owners[i - 1] = cityToOwner[i];
+        }
+    }
+
+    function loseMoney(address winner, address loser) external {
+        require(msg.sender == pvpBattles, "Only PvP battles");
+        uint256[] storage ids = ownerToBuildingIds[loser];
+        uint256 payout = 0;
+        uint256 time = block.timestamp;
+
+        for (uint256 i = 0; i < ids.length; i++) {
+            Building storage b = buildings[ids[i]];
+
+            if (b.isActive && _getBuildingType(b.dna) == 0 && time >= b.updateReadyTime) {
+                payout += 100 * b.level;
+                b.updateReadyTime = uint256(time + 4 hours);
+            }
+        }
+
+        if (payout > 0) {
+            token.gameTransfer(winner, payout);
+        }
     }
 }
