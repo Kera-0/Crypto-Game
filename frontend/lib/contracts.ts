@@ -641,6 +641,27 @@ export const buildingItemAbi = [
       },
     ],
   },
+  {
+    type: 'function',
+    name: 'levelUpBuildingPrice',
+    stateMutability: 'view',
+    inputs: [{ name: '', type: 'uint256' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'upgradeBuildingLevel',
+    stateMutability: 'payable',
+    inputs: [{ name: 'buildingId', type: 'uint256' }],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'getLevelUpBuildingPrice',
+    stateMutability: 'view',
+    inputs: [{ name: 'buildingId', type: 'uint256' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
 ] as const
 
 export const buildingMarketplaceAbi = [

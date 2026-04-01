@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { decodeEventLog, formatEther } from 'viem'
 import { useAccount, usePublicClient, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { Navbar } from '@/components/navbar'
-import { CITY_ADDRESS, TOKEN_ADDRESS, cityAbi, tokenAbi } from '@/lib/contracts'
+import { CITY_ADDRESS, TOKEN_ADDRESS, cityAbi, tokenAbi, buildingItemAbi } from '@/lib/contracts'
 
 type Cell = {
   row: number
@@ -55,7 +55,7 @@ type CityStatsResponse =
   | { level: number | bigint; power: bigint }
   | readonly [number | bigint, bigint]
 
-type PendingAction = 'createCity' | 'putBuilding' | 'moveBuilding' | 'removeBuilding' | 'getMoney' | 'getPower' | 'upgradeLevel'
+type PendingAction = 'createCity' | 'putBuilding' | 'moveBuilding' | 'removeBuilding' | 'getMoney' | 'getPower' | 'upgradeLevel' | 'upgradeBuilding'
 
 const CONTRACT_UNAVAILABLE_MESSAGE = 'City contract is not deployed on the current Hardhat RPC. Run make deploy-local and reload the page.'
 
@@ -613,6 +613,8 @@ export default function Page() {
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
   const [currentTimeSec, setCurrentTimeSec] = useState(() => Math.floor(Date.now() / 1000))
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
+  const [selectedBuildingId, setSelectedBuildingId] = useState<bigint | null>(null)
+  const [upgradeBuildingModalOpen, setUpgradeBuildingModalOpen] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [cityContractReady, setCityContractReady] = useState<boolean | null>(null)
   const boardRef = useRef<HTMLDivElement | null>(null)
@@ -652,6 +654,20 @@ export default function Page() {
     args: [],
     account: address,
     query: { enabled: !!address && cityContractReady === true && !!cityId && cityId !== BigInt(0) },
+  })
+
+  const selectedBuilding = useMemo(
+    () => (selectedBuildingId !== null ? buildings.find((b) => b.id === selectedBuildingId) ?? null : null),
+    [buildings, selectedBuildingId],
+  )
+
+  const { data: levelUpPriceData, refetch: refetchLevelUpPrice } = useReadContract({
+    address: CITY_ADDRESS,
+    abi: buildingItemAbi,
+    functionName: 'getLevelUpBuildingPrice',
+    args: selectedBuilding ? [selectedBuilding.id] : undefined,
+    account: address,
+    query: { enabled: !!selectedBuilding && !!address && cityContractReady === true },
   })
 
   const { data: txReceipt, isLoading: txPending } = useWaitForTransactionReceipt({
@@ -841,7 +857,7 @@ export default function Page() {
 
     let powerGained = 0n
     let shouldRefetchStats = pendingAction === 'upgradeLevel' || pendingAction === 'createCity'
-    let shouldRefreshBuildings = pendingAction === 'getMoney' || pendingAction === 'getPower'
+    let shouldRefreshBuildings = pendingAction === 'getMoney' || pendingAction === 'getPower' || pendingAction === 'upgradeBuilding'
     let shouldRefetchUpgradePrice = pendingAction === 'upgradeLevel' || pendingAction === 'createCity'
 
     for (const log of txReceipt.logs) {
@@ -1168,6 +1184,12 @@ export default function Page() {
   async function handleTileClick(cell: Cell) {
     setSelectedCell({ row: cell.row, col: cell.col })
 
+    if (cell.buildingId !== BigInt(0)) {
+      setSelectedBuildingId(cell.buildingId)
+    } else {
+      setSelectedBuildingId(null)
+    }
+
     if (!deleteMode || cell.buildingId === BigInt(0) || txPending) {
       return
     }
@@ -1175,6 +1197,23 @@ export default function Page() {
     await removeBuilding(cell.buildingId)
     setDeleteMode(false)
     setInventoryOpen(false)
+  }
+
+  async function upgradeBuilding() {
+    if (!selectedBuilding || levelUpPriceData === undefined) return
+    const buildingId = selectedBuilding.id
+    const price = levelUpPriceData as bigint
+    await sendContractTransaction(
+      'upgradeBuilding',
+      () => writeContractAsync({
+        address: CITY_ADDRESS,
+        abi: buildingItemAbi,
+        functionName: 'upgradeBuildingLevel',
+        args: [buildingId],
+        value: price,
+      }),
+      () => setUpgradeBuildingModalOpen(false),
+    )
   }
 
   return (
@@ -1291,6 +1330,41 @@ export default function Page() {
                         style={upgradeConfirmButton}
                       >
                         Confirm Upgrade
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {upgradeBuildingModalOpen && selectedBuilding && (
+                <div style={upgradeModalOverlay}>
+                  <div style={upgradeModalCard}>
+                    <div style={{ fontSize: 12, letterSpacing: 0.8, textTransform: 'uppercase', opacity: 0.7 }}>
+                      Улучшение здания #{selectedBuilding.id.toString()}
+                    </div>
+                    <div style={{ fontSize: 22, fontWeight: 900 }}>
+                      Уровень {selectedBuilding.level} → {selectedBuilding.level + 1}
+                    </div>
+                    <div style={{ fontSize: 15, color: '#86efac' }}>
+                      Доход: +100
+                    </div>
+                    <div style={{ fontSize: 15, color: '#cbd5e1' }}>
+                      Цена: {levelUpPriceData !== undefined ? `${formatEther(levelUpPriceData as bigint)} ETH` : 'Загрузка...'}
+                    </div>
+                    <div style={upgradeModalActions}>
+                      <button
+                        onClick={() => setUpgradeBuildingModalOpen(false)}
+                        style={upgradeCancelButton}
+                        disabled={txPending}
+                      >
+                        Отмена
+                      </button>
+                      <button
+                        onClick={() => void upgradeBuilding()}
+                        disabled={txPending || levelUpPriceData === undefined}
+                        style={upgradeConfirmButton}
+                      >
+                        Upgrade
                       </button>
                     </div>
                   </div>
@@ -1592,6 +1666,21 @@ export default function Page() {
               ))}
             </div>
           </aside>
+        </div>
+      )}
+
+      {selectedBuilding && !upgradeBuildingModalOpen && (
+        <div style={buildingActionBar}>
+          <button
+            onClick={() => {
+              void refetchLevelUpPrice()
+              setUpgradeBuildingModalOpen(true)
+            }}
+            style={upgradeBuildingButton}
+            disabled={txPending}
+          >
+            Upgrade
+          </button>
         </div>
       )}
     </main>
@@ -1951,6 +2040,29 @@ const shapeCellEmpty: React.CSSProperties = {
   borderRadius: 6,
   background: 'rgba(51, 65, 85, 0.45)',
   border: '1px dashed rgba(100, 116, 139, 0.45)',
+}
+
+const buildingActionBar: React.CSSProperties = {
+  position: 'fixed',
+  bottom: 32,
+  left: '50%',
+  transform: 'translateX(-50%)',
+  zIndex: 60,
+  display: 'flex',
+  gap: 10,
+}
+
+const upgradeBuildingButton: React.CSSProperties = {
+  height: 52,
+  padding: '0 36px',
+  borderRadius: 16,
+  border: '1px solid rgba(245, 158, 11, 0.52)',
+  background: 'linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%)',
+  color: '#3b2200',
+  fontSize: 17,
+  fontWeight: 900,
+  cursor: 'pointer',
+  boxShadow: '0 8px 24px rgba(245, 158, 11, 0.35)',
 }
 
 const cityBoardShell: React.CSSProperties = {

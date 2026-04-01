@@ -14,7 +14,7 @@ contract BuildingItem is Ownable {
 
     struct Building {
         uint64 dna;              // первые 5 битов - тип здания (казарма, шахта и тд), следующие 9 - маска для формы здания внутри квадрата 3x3, остальные 50 - внешний вид TODO
-        uint32 level;            // уровень здания
+        uint8 level;            // уровень здания
         uint256 updateReadyTime;  // время до взаимодействия со зданием
         bool isActive;           // расположен ли нфт на поле или лежит в инвентаре
     }
@@ -26,7 +26,11 @@ contract BuildingItem is Ownable {
     mapping(uint256 => uint256) public buildingIdToOwnerIndex;
     
     IBuildingMarketplace public marketplace;
-    address public minter; // the marketplace contract that can mint new buildings
+    address public minter;
+
+    uint256[32] levelUpBuildingPrice;
+
+    event buildingLevelUpgraded(address indexed addr, uint8 level);
 
     function setMarketplace(address m) external onlyOwner {
         marketplace = IBuildingMarketplace(m);
@@ -46,8 +50,6 @@ contract BuildingItem is Ownable {
         _;
     }
 
-    /// @notice Mint a new building directly to `to` with the given DNA.
-    ///         Called by the marketplace when a player buys from the official stock.
     function mint(address to, uint64 dna) external onlyMinter returns (uint256) {
         buildings.push(Building(dna, 1, uint256(block.timestamp + 4 hours), false));
         uint256 id = buildings.length - 1;
@@ -136,8 +138,29 @@ contract BuildingItem is Ownable {
         return mask & 0x1FF;
     }
 
-
     function ownerOf(uint256 tokenId) external view returns (address) {
         return buildingToOwner[tokenId];
     }
+
+    function setLevelUpBuildingPrice(uint8 level, uint256 price) external onlyOwner {
+        require(level <= 10);
+        require(price > 0);
+        levelUpBuildingPrice[level] = price;
+    }
+
+    function upgradeBuildingLevel(uint256 buildingId) external payable {
+        Building storage building = buildings[buildingId];
+        require(msg.sender == buildingToOwner[buildingId]);
+        require(msg.value == levelUpBuildingPrice[building.level], "wrong value");
+
+        building.level += 1;
+        emit buildingLevelUpgraded(msg.sender, building.level);
+    }
+
+    function getLevelUpBuildingPrice(uint256 buildingId) external view returns (uint256) {
+        require(msg.sender == buildingToOwner[buildingId]);
+        Building memory building = buildings[buildingId];
+        return levelUpBuildingPrice[building.level];
+    }
+
 }

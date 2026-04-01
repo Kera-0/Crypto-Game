@@ -107,7 +107,7 @@ contract CityFiled is BuildingFactory, ReentrancyGuard {
             Building storage b = buildings[ids[i]];
 
             if (b.isActive && _getBuildingType(b.dna) == 0 && time >= b.updateReadyTime) {
-                payout += 100 * b.level;
+                payout += 10**19 * b.level;
                 b.updateReadyTime = uint256(time + 4 hours);
             }
         }
