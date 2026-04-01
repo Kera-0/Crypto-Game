@@ -10,6 +10,7 @@ contract InGameCurrency is Ownable {
     event SpenderSet(address indexed spender, bool allowed);
     event Minted(address indexed to, uint256 amount);
     event Spent(address indexed from, address indexed spender, uint256 amount);
+    event MovedBySpender(address indexed spender, address indexed from, address indexed to, uint256 amount);
 
     error NotSpender();
     error InsufficientBalance();
@@ -34,5 +35,16 @@ contract InGameCurrency is Ownable {
             balanceOf[from] = b - amount;
         }
         emit Spent(from, msg.sender, amount);
+    }
+
+    function moveBySpender(address from, address to, uint256 amount) external {
+        if (!isSpender[msg.sender]) revert NotSpender();
+        uint256 b = balanceOf[from];
+        if (b < amount) revert InsufficientBalance();
+        unchecked {
+            balanceOf[from] = b - amount;
+        }
+        balanceOf[to] += amount;
+        emit MovedBySpender(msg.sender, from, to, amount);
     }
 }

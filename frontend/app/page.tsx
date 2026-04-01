@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { decodeEventLog, formatEther } from 'viem'
 import { useAccount, usePublicClient, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { Navbar } from '@/components/navbar'
-import { CITY_ADDRESS, ENABLE_TEST_ACTIONS, TOKEN_ADDRESS, cityAbi, tokenAbi } from '@/lib/contracts'
+import { CITY_ADDRESS, TOKEN_ADDRESS, cityAbi, tokenAbi } from '@/lib/contracts'
 
 type Cell = {
   row: number
@@ -57,9 +57,34 @@ type CityStatsResponse =
 
 type PendingAction = 'createCity' | 'putBuilding' | 'moveBuilding' | 'removeBuilding' | 'getMoney' | 'getPower' | 'upgradeLevel'
 
+const CONTRACT_UNAVAILABLE_MESSAGE = 'City contract is not deployed on the current Hardhat RPC. Run make deploy-local and reload the page.'
+
 const GRID_SIZE = 12
 const TILE_WIDTH = 96
 const TILE_HEIGHT = 52
+
+function isContractUnavailableMessage(message: string) {
+  return /requested resource not available|returned no data|could not decode result data/i.test(message)
+}
+
+function extractErrorMessage(error: unknown) {
+  if (typeof error === 'object' && error !== null) {
+    if ('shortMessage' in error && typeof error.shortMessage === 'string') {
+      return error.shortMessage
+    }
+
+    if ('message' in error && typeof error.message === 'string') {
+      return error.message
+    }
+  }
+
+  return 'Transaction failed. Please try again.'
+}
+
+function formatActionError(error: unknown) {
+  const rawMessage = extractErrorMessage(error).split('\n')[0]?.trim() ?? 'Transaction failed. Please try again.'
+  return isContractUnavailableMessage(rawMessage) ? CONTRACT_UNAVAILABLE_MESSAGE : rawMessage
+}
 
 function getBuildingType(dna: bigint) {
   return Number(dna & BigInt(0x1f))
@@ -114,9 +139,11 @@ function normalizeCityStats(stats: CityStatsResponse): CityStats {
     }
   }
 
+  const namedStats = stats as { level: number | bigint; power: bigint }
+
   return {
-    level: Number(stats.level),
-    power: BigInt(stats.power),
+    level: Number(namedStats.level),
+    power: BigInt(namedStats.power),
   }
 }
 
@@ -362,6 +389,8 @@ export default function Page() {
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
   const [currentTimeSec, setCurrentTimeSec] = useState(() => Math.floor(Date.now() / 1000))
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [cityContractReady, setCityContractReady] = useState<boolean | null>(null)
   const selectedLayerIndex = Number(selectedLayer)
   const availableLayerCount = Math.max((cityStats?.level ?? 0) + 1, 1)
 
@@ -370,7 +399,7 @@ export default function Page() {
     abi: cityAbi,
     functionName: 'ownerToCity',
     args: address ? [address] : undefined,
-    query: { enabled: !!address },
+    query: { enabled: !!address && cityContractReady === true },
   })
 
   const { data: tokenBalance, refetch: refetchBalance } = useReadContract({
@@ -378,7 +407,7 @@ export default function Page() {
     abi: tokenAbi,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
-    query: { enabled: !!address },
+    query: { enabled: !!address && cityContractReady === true },
   })
 
   const { data: cityStatsData, refetch: refetchCityStats } = useReadContract({
@@ -386,7 +415,7 @@ export default function Page() {
     abi: cityAbi,
     functionName: 'getCityStats',
     args: address ? [address] : undefined,
-    query: { enabled: !!address && !!cityId && cityId !== BigInt(0) },
+    query: { enabled: !!address && cityContractReady === true && !!cityId && cityId !== BigInt(0) },
   })
 
   const { data: upgradeLevelPriceData, refetch: refetchUpgradeLevelPrice } = useReadContract({
@@ -395,7 +424,7 @@ export default function Page() {
     functionName: 'getUpgradeLevelPrice',
     args: [],
     account: address,
-    query: { enabled: !!address && !!cityId && cityId !== BigInt(0) },
+    query: { enabled: !!address && cityContractReady === true && !!cityId && cityId !== BigInt(0) },
   })
 
   const { data: txReceipt, isLoading: txPending } = useWaitForTransactionReceipt({
@@ -403,8 +432,45 @@ export default function Page() {
     query: { enabled: !!hash },
   })
 
+  useEffect(() => {
+    let cancelled = false
+
+    async function checkCityContract() {
+      if (!publicClient) {
+        setCityContractReady(null)
+        return
+      }
+
+      try {
+        const code = await publicClient.getCode({ address: CITY_ADDRESS })
+
+        if (cancelled) return
+
+        const ready = !!code && code !== '0x'
+        setCityContractReady(ready)
+
+        if (ready) {
+          setActionError((current) => (current === CONTRACT_UNAVAILABLE_MESSAGE ? null : current))
+        }
+      } catch {
+        if (!cancelled) {
+          setCityContractReady(null)
+        }
+      }
+    }
+
+    void checkCityContract()
+
+    return () => {
+      cancelled = true
+    }
+  }, [publicClient])
+
   const refreshBuildings = useCallback(async () => {
-    if (!publicClient || !address) return
+    if (!publicClient || !address || cityContractReady !== true) {
+      setBuildings([])
+      return
+    }
 
     const ids: bigint[] = []
 
@@ -456,9 +522,10 @@ export default function Page() {
               | { layer: number | bigint; top: number | bigint; left: number | bigint }
               | readonly [number | bigint, number | bigint, number | bigint]
 
-            const layer = Array.isArray(rawPosition) ? rawPosition[0] : rawPosition.layer
-            const top = Array.isArray(rawPosition) ? rawPosition[1] : rawPosition.top
-            const left = Array.isArray(rawPosition) ? rawPosition[2] : rawPosition.left
+            const namedPosition = rawPosition as { layer: number | bigint; top: number | bigint; left: number | bigint }
+            const layer = Array.isArray(rawPosition) ? rawPosition[0] : namedPosition.layer
+            const top = Array.isArray(rawPosition) ? rawPosition[1] : namedPosition.top
+            const left = Array.isArray(rawPosition) ? rawPosition[2] : namedPosition.left
 
             position = {
               layer: Number(layer),
@@ -482,10 +549,10 @@ export default function Page() {
     )
 
     setBuildings(mappedBuildings.filter((building): building is BuildingData => building !== null))
-  }, [address, publicClient])
+  }, [address, cityContractReady, publicClient])
 
   const loadGrid = useCallback(async () => {
-    if (!publicClient || !address || !cityId || cityId === BigInt(0)) {
+    if (!publicClient || !address || cityContractReady !== true || !cityId || cityId === BigInt(0)) {
       setGrid([])
       return
     }
@@ -517,7 +584,7 @@ export default function Page() {
     } finally {
       setLoadingGrid(false)
     }
-  }, [address, cityId, publicClient, selectedLayer])
+  }, [address, cityContractReady, cityId, publicClient, selectedLayer])
 
   useEffect(() => {
     loadGrid()
@@ -603,111 +670,152 @@ export default function Page() {
     return () => window.clearInterval(interval)
   }, [])
 
-  async function createCity() {
-    const tx = await writeContractAsync({
-      address: CITY_ADDRESS,
-      abi: cityAbi,
-      functionName: 'createCity',
-      args: [],
-    })
+  async function sendContractTransaction(
+    action: PendingAction,
+    write: () => Promise<`0x${string}`>,
+    onSubmitted?: () => void,
+  ) {
+    setActionError(null)
 
-    setPendingAction('createCity')
-    setHash(tx)
-    setTimeout(() => {
-      refetchCityId()
-      refetchCityStats()
-      loadGrid()
-      refreshBuildings()
-    }, 1500)
+    try {
+      const tx = await write()
+      setPendingAction(action)
+      setHash(tx)
+      onSubmitted?.()
+    } catch (error) {
+      const message = formatActionError(error)
+      setActionError(message)
+
+      if (message === CONTRACT_UNAVAILABLE_MESSAGE) {
+        setCityContractReady(false)
+      }
+    }
+  }
+
+  async function createCity() {
+    await sendContractTransaction(
+      'createCity',
+      () =>
+        writeContractAsync({
+          address: CITY_ADDRESS,
+          abi: cityAbi,
+          functionName: 'createCity',
+          args: [],
+        }),
+      () => {
+        setTimeout(() => {
+          void refetchCityId()
+          void refetchCityStats()
+          void loadGrid()
+          void refreshBuildings()
+        }, 1500)
+      },
+    )
   }
 
   async function placeBuilding(buildingId: bigint, row: number, col: number) {
-    const tx = await writeContractAsync({
-      address: CITY_ADDRESS,
-      abi: cityAbi,
-      functionName: 'putBuilding',
-      args: [Number(selectedLayer), row, col, buildingId],
-    })
-
-    setPendingAction('putBuilding')
-    setHash(tx)
-    setTimeout(() => {
-      loadGrid()
-      refreshBuildings()
-    }, 1500)
+    await sendContractTransaction(
+      'putBuilding',
+      () =>
+        writeContractAsync({
+          address: CITY_ADDRESS,
+          abi: cityAbi,
+          functionName: 'putBuilding',
+          args: [Number(selectedLayer), row, col, buildingId],
+        }),
+      () => {
+        setTimeout(() => {
+          void loadGrid()
+          void refreshBuildings()
+        }, 1500)
+      },
+    )
   }
 
   async function relocateBuilding(buildingId: bigint, row: number, col: number) {
-    const tx = await writeContractAsync({
-      address: CITY_ADDRESS,
-      abi: cityAbi,
-      functionName: 'moveBuilding',
-      args: [Number(selectedLayer), row, col, buildingId],
-    })
-
-    setPendingAction('moveBuilding')
-    setHash(tx)
-    setTimeout(() => {
-      loadGrid()
-      refreshBuildings()
-    }, 1500)
+    await sendContractTransaction(
+      'moveBuilding',
+      () =>
+        writeContractAsync({
+          address: CITY_ADDRESS,
+          abi: cityAbi,
+          functionName: 'moveBuilding',
+          args: [Number(selectedLayer), row, col, buildingId],
+        }),
+      () => {
+        setTimeout(() => {
+          void loadGrid()
+          void refreshBuildings()
+        }, 1500)
+      },
+    )
   }
 
   async function removeBuilding(buildingId: bigint) {
-    const tx = await writeContractAsync({
-      address: CITY_ADDRESS,
-      abi: cityAbi,
-      functionName: 'removeBuilding',
-      args: [buildingId],
-    })
-
-    setPendingAction('removeBuilding')
-    setHash(tx)
-    setTimeout(() => {
-      loadGrid()
-      refreshBuildings()
-    }, 1500)
+    await sendContractTransaction(
+      'removeBuilding',
+      () =>
+        writeContractAsync({
+          address: CITY_ADDRESS,
+          abi: cityAbi,
+          functionName: 'removeBuilding',
+          args: [buildingId],
+        }),
+      () => {
+        setTimeout(() => {
+          void loadGrid()
+          void refreshBuildings()
+        }, 1500)
+      },
+    )
   }
 
   async function collectMoney() {
-    const tx = await writeContractAsync({
-      address: CITY_ADDRESS,
-      abi: cityAbi,
-      functionName: 'getMoney',
-      args: [],
-    })
-
-    setPendingAction('getMoney')
-    setHash(tx)
-    setTimeout(refetchBalance, 1500)
+    await sendContractTransaction(
+      'getMoney',
+      () =>
+        writeContractAsync({
+          address: CITY_ADDRESS,
+          abi: cityAbi,
+          functionName: 'getMoney',
+          args: [],
+        }),
+      () => {
+        setTimeout(() => {
+          void refetchBalance()
+        }, 1500)
+      },
+    )
   }
 
   async function collectPower() {
-    const tx = await writeContractAsync({
-      address: CITY_ADDRESS,
-      abi: cityAbi,
-      functionName: 'getPower',
-      args: [],
-    })
-
-    setPendingAction('getPower')
-    setHash(tx)
+    await sendContractTransaction('getPower', () =>
+      writeContractAsync({
+        address: CITY_ADDRESS,
+        abi: cityAbi,
+        functionName: 'getPower',
+        args: [],
+      }),
+    )
   }
 
   async function upgradeLevel() {
     if (upgradeLevelPriceData === undefined) return
 
-    const tx = await writeContractAsync({
-      address: CITY_ADDRESS,
-      abi: cityAbi,
-      functionName: 'upgradeLevel',
-      args: [],
-      value: BigInt(upgradeLevelPriceData),
-    })
-
-    setUpgradeModalOpen(false)
-    setPendingAction('upgradeLevel')
-    setHash(tx)
+    await sendContractTransaction(
+      'upgradeLevel',
+      () =>
+        writeContractAsync({
+          address: CITY_ADDRESS,
+          abi: cityAbi,
+          functionName: 'upgradeLevel',
+          args: [],
+          value: BigInt(upgradeLevelPriceData),
+        }),
+      () => {
+        setUpgradeModalOpen(false)
+      },
+    )
   }
 
   const inventoryBuildings = useMemo(() => buildings.filter((building) => !building.isActive), [buildings])
@@ -936,10 +1044,14 @@ export default function Page() {
                     <div style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 1, opacity: 0.72 }}>Fresh territory</div>
                     <div style={{ fontSize: 36, fontWeight: 900, lineHeight: 1.05 }}>Create your city</div>
                     <div style={{ maxWidth: 420, fontSize: 15, opacity: 0.82 }}>
-                      Found your city first. After that you can open inventory and place buildings directly on the map.
+                      {cityContractReady === false
+                        ? 'The local Hardhat RPC is running, but the city contract is not deployed yet. Run make deploy-local, then reload this page.'
+                        : cityContractReady === null
+                          ? 'Checking whether the city contract is available on the connected RPC...'
+                          : 'Found your city first. After that you can open inventory and place buildings directly on the map.'}
                     </div>
-                    <button onClick={createCity} disabled={txPending} style={createCityButton}>
-                      Create City
+                    <button onClick={createCity} disabled={txPending || cityContractReady !== true} style={createCityButton}>
+                      {cityContractReady === false ? 'Contract Missing' : cityContractReady === null ? 'Checking...' : 'Create City'}
                     </button>
                   </div>
                 </div>
@@ -1054,6 +1166,7 @@ export default function Page() {
             </div>
 
             {hash && <div style={mapFooterNote}>tx: {hash}</div>}
+            {actionError && <div style={errorBanner}>{actionError}</div>}
 
             {draggingBuilding && (
               <div style={{ marginTop: 12, fontSize: 13, color: canDropHere === false ? '#fecaca' : '#e5e7eb' }}>
@@ -1304,6 +1417,17 @@ const mapFooterNote: React.CSSProperties = {
   color: '#e5e7eb',
   fontSize: 12,
   wordBreak: 'break-all',
+}
+
+const errorBanner: React.CSSProperties = {
+  marginTop: 12,
+  padding: '12px 14px',
+  borderRadius: 14,
+  background: 'rgba(127, 29, 29, 0.9)',
+  border: '1px solid rgba(248, 113, 113, 0.5)',
+  color: '#fee2e2',
+  fontSize: 13,
+  lineHeight: 1.45,
 }
 
 const actionPrimaryButton: React.CSSProperties = {

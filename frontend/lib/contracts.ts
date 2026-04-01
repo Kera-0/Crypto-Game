@@ -5,6 +5,7 @@ export const TOKEN_ADDRESS = (process.env.NEXT_PUBLIC_TOKEN_ADDRESS ?? '0x5fbdb2
 export const HERO_CURRENCY_ADDRESS = (process.env.NEXT_PUBLIC_HERO_CURRENCY_ADDRESS ?? ZERO_ADDRESS) as `0x${string}`
 export const HERO_NFT_ADDRESS = (process.env.NEXT_PUBLIC_HERO_NFT_ADDRESS ?? ZERO_ADDRESS) as `0x${string}`
 export const PACK_OPENER_ADDRESS = (process.env.NEXT_PUBLIC_PACK_OPENER_ADDRESS ?? ZERO_ADDRESS) as `0x${string}`
+export const HERO_MARKETPLACE_ADDRESS = (process.env.NEXT_PUBLIC_HERO_MARKETPLACE_ADDRESS ?? ZERO_ADDRESS) as `0x${string}`
 export const ENABLE_TEST_ACTIONS = process.env.NEXT_PUBLIC_ENABLE_TEST_ACTIONS === 'true'
 
 export function isConfiguredAddress(address: `0x${string}`) {
@@ -255,6 +256,23 @@ export const heroNftAbi = [
   },
   {
     type: 'function',
+    name: 'approve',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'to', type: 'address' },
+      { name: 'tokenId', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'getApproved',
+    stateMutability: 'view',
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    outputs: [{ name: '', type: 'address' }],
+  },
+  {
+    type: 'function',
     name: 'hero',
     stateMutability: 'view',
     inputs: [{ name: 'tokenId', type: 'uint256' }],
@@ -354,5 +372,83 @@ export const packOpenerAbi = [
     stateMutability: 'nonpayable',
     inputs: [],
     outputs: [{ name: 'requestId', type: 'uint256' }],
+  },
+] as const
+
+export const heroMarketplaceAbi = [
+  {
+    type: 'function',
+    name: 'feeBps',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint16' }],
+  },
+  {
+    type: 'function',
+    name: 'activeListingCount',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'list',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'tokenId', type: 'uint256' },
+      { name: 'price', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'updatePrice',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'tokenId', type: 'uint256' },
+      { name: 'newPrice', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'cancel',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'buy',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'listings',
+    stateMutability: 'view',
+    inputs: [{ name: '', type: 'uint256' }],
+    outputs: [
+      { name: 'seller', type: 'address' },
+      { name: 'price', type: 'uint256' },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'getActiveListings',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [
+      {
+        name: 'items',
+        type: 'tuple[]',
+        components: [
+          { name: 'tokenId', type: 'uint256' },
+          { name: 'seller', type: 'address' },
+          { name: 'price', type: 'uint256' },
+        ],
+      },
+    ],
   },
 ] as const
