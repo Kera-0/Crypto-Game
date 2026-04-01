@@ -8,7 +8,6 @@ import { HamsterAvatar, RARITY_THEMES } from '@/components/HamsterAvatar'
 import { PackOpeningModal } from '@/components/PackOpeningModal'
 import type { HeroSnapshot } from '@/components/HamsterAvatar'
 import {
-  ENABLE_TEST_ACTIONS,
   HERO_CURRENCY_ADDRESS,
   HERO_NFT_ADDRESS,
   PACK_OPENER_ADDRESS,
@@ -68,6 +67,37 @@ function xpForNextLevel(level: number) {
   return 100 * level * level
 }
 
+function extractErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message
+  if (typeof error === 'string') return error
+  return 'Transaction failed.'
+}
+
+function formatActionError(error: unknown) {
+  const message = extractErrorMessage(error)
+  const normalized = message.toLowerCase()
+
+  if (normalized.includes('user rejected') || normalized.includes('user denied')) {
+    return 'The transaction was cancelled in your wallet.'
+  }
+
+  if (normalized.includes('out of gas') || normalized.includes('internal error')) {
+    return 'Hardhat Local rejected the default gas settings for this transaction. Gas is now estimated automatically, so try the action again.'
+  }
+
+  if (
+    normalized.includes('insufficient') ||
+    normalized.includes('spendfrom') ||
+    normalized.includes('spend from') ||
+    normalized.includes('currency') ||
+    normalized.includes('exceeds balance')
+  ) {
+    return 'Not enough hero currency for this action yet. Claim Free Tokens and try again.'
+  }
+
+  return message
+}
+
 function normalizeStats(stats: readonly [number, number, number, number, number] | StatBlock): StatBlock {
   if (Array.isArray(stats)) {
     return {
@@ -79,12 +109,14 @@ function normalizeStats(stats: readonly [number, number, number, number, number]
     }
   }
 
+  const namedStats = stats as StatBlock
+
   return {
-    atk: Number(stats.atk),
-    def_: Number(stats.def_),
-    hp: Number(stats.hp),
-    agi: Number(stats.agi),
-    lck: Number(stats.lck),
+    atk: Number(namedStats.atk),
+    def_: Number(namedStats.def_),
+    hp: Number(namedStats.hp),
+    agi: Number(namedStats.agi),
+    lck: Number(namedStats.lck),
   }
 }
 
@@ -167,6 +199,7 @@ export default function HeroesPage() {
   const [packModalOpen, setPackModalOpen] = useState(false)
   const [packPurchased, setPackPurchased] = useState(false)
   const [packWinner, setPackWinner] = useState<HeroSnapshot | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const heroIdsBeforeRef = useRef<Set<string>>(new Set())
   const packPendingRef = useRef(false)
 
@@ -209,8 +242,10 @@ export default function HeroesPage() {
     query: { enabled: !!hash },
   })
 
-  async function loadHeroes() {
-    if (!publicClient || !address || !heroContractsReady || !nextHeroId) {
+  async function loadHeroes(nextHeroIdOverride?: bigint) {
+    const resolvedNextHeroId = nextHeroIdOverride ?? nextHeroId
+
+    if (!publicClient || !address || !heroContractsReady || !resolvedNextHeroId) {
       setHeroes([])
       setSelectedHeroId(null)
       return
@@ -220,7 +255,7 @@ export default function HeroesPage() {
     setStatus('Syncing your hero roster from chain...')
 
     try {
-      const nextHeroes = await fetchOwnedHeroes(publicClient, address, nextHeroId)
+      const nextHeroes = await fetchOwnedHeroes(publicClient, address, resolvedNextHeroId)
 
       if (!nextHeroes.length) {
         setHeroes([])
@@ -236,19 +271,48 @@ export default function HeroesPage() {
       })
       setStatus(`Synced ${nextHeroes.length} hero${nextHeroes.length === 1 ? '' : 'es'} from chain.`)
 
-      // If pack opening is pending — find the new hero and set as winner
-      if (packPendingRef.current) {
-        const newHero = nextHeroes.find((h) => !heroIdsBeforeRef.current.has(h.id.toString()))
-        if (newHero) {
-          setPackWinner(newHero)
-          packPendingRef.current = false
-        }
-      }
+      // If pack opening is pending вЂ” find the new hero and set as winner
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Failed to load hero roster.')
     } finally {
       setIsLoadingHeroes(false)
     }
+  }
+
+  async function pollPackWinner(attempt = 0) {
+    if (!publicClient || !address || !heroContractsReady || !packPendingRef.current) {
+      return
+    }
+
+    try {
+      const currentNextHeroId = (await publicClient.readContract({
+        address: HERO_NFT_ADDRESS,
+        abi: heroNftAbi,
+        functionName: 'nextId',
+      })) as bigint
+
+      const nextHeroes = await fetchOwnedHeroes(publicClient, address, currentNextHeroId)
+      const newHero = nextHeroes.find((hero) => !heroIdsBeforeRef.current.has(hero.id.toString()))
+
+      if (newHero) {
+        setPackWinner(newHero)
+        setStatus('Pack is ready. Click "Open" to reveal your hamster.')
+        return
+      }
+    } catch {
+      // Keep polling while the chain resolves the purchased pack.
+    }
+
+    if (!packPendingRef.current) return
+
+    if (attempt >= 20) {
+      setStatus('Pack purchased. Waiting for the hero to arrive on-chain...')
+      return
+    }
+
+    window.setTimeout(() => {
+      void pollPackWinner(attempt + 1)
+    }, 2000)
   }
 
   useEffect(() => {
@@ -258,6 +322,13 @@ export default function HeroesPage() {
       return
     }
 
+    if (packPendingRef.current || packPurchased || packModalOpen) {
+      return
+    }
+
+    const client = publicClient
+    const owner = address
+    const heroIdCeiling = nextHeroId
     let cancelled = false
 
     async function run() {
@@ -265,7 +336,7 @@ export default function HeroesPage() {
       setStatus('Syncing your hero roster from chain...')
 
       try {
-        const nextHeroes = await fetchOwnedHeroes(publicClient, address, nextHeroId)
+        const nextHeroes = await fetchOwnedHeroes(client, owner, heroIdCeiling)
         if (cancelled) return
 
         if (!nextHeroes.length) {
@@ -294,76 +365,128 @@ export default function HeroesPage() {
     return () => {
       cancelled = true
     }
-  }, [address, heroContractsReady, nextHeroId, publicClient])
+  }, [address, heroContractsReady, nextHeroId, packModalOpen, packPurchased, publicClient])
 
   async function buyPack() {
-    // Save current hero IDs before buying
-    heroIdsBeforeRef.current = new Set(heroes.map((h) => h.id.toString()))
-    packPendingRef.current = true
-    setPackWinner(null)
+    if (!publicClient || !address || !packContractsReady) return
 
-    const tx = await writeContractAsync({
-      address: PACK_OPENER_ADDRESS,
-      abi: packOpenerAbi,
-      functionName: 'buyPack',
-      args: [],
-    })
+    setActionError(null)
+    setHash(undefined)
+    setStatus('Preparing pack purchase...')
 
-    setHash(tx)
-    setPackPurchased(true)
-    setStatus('Pack purchased! Click "Open" to reveal your hamster.')
+    try {
+      heroIdsBeforeRef.current = new Set(heroes.map((hero) => hero.id.toString()))
+      packPendingRef.current = true
+      setPackWinner(null)
 
-    // Load heroes after VRF resolves (local: instant, mainnet: ~30s)
-    setTimeout(() => {
-      refetchBalance()
-      refetchNextHeroId()
-      void loadHeroes()
-    }, 4000)
+      const simulation = await publicClient.simulateContract({
+        account: address,
+        address: PACK_OPENER_ADDRESS,
+        abi: packOpenerAbi,
+        functionName: 'buyPack',
+        args: [],
+      })
+
+      const estimatedGas = await publicClient.estimateContractGas({
+        account: address,
+        address: PACK_OPENER_ADDRESS,
+        abi: packOpenerAbi,
+        functionName: 'buyPack',
+        args: [],
+      })
+
+      const tx = await writeContractAsync({
+        address: PACK_OPENER_ADDRESS,
+        abi: packOpenerAbi,
+        functionName: 'buyPack',
+        args: [],
+        // Hardhat Local can reject default gas for this call unless we send an explicit limit.
+        gas: simulation.request.gas ?? (estimatedGas * 12n) / 10n,
+      })
+
+      setHash(tx)
+      setPackPurchased(true)
+      setStatus('Pack purchased. Waiting for the hero reveal...')
+      window.setTimeout(() => {
+        void refetchBalance()
+        void pollPackWinner()
+      }, 1500)
+    } catch (error) {
+      packPendingRef.current = false
+      setPackPurchased(false)
+      setPackWinner(null)
+      setActionError(formatActionError(error))
+      setStatus('Pack purchase failed.')
+    }
   }
 
   async function claimHeroCurrency() {
-    const tx = await writeContractAsync({
-      address: HERO_CURRENCY_ADDRESS,
-      abi: tokenAbi,
-      functionName: 'faucet',
-      args: [BigInt(250) * BigInt(10) ** BigInt(18)],
-    })
+    setActionError(null)
+    setHash(undefined)
 
-    setHash(tx)
-    setStatus('Hero currency faucet sent. Refreshing balance...')
-    setTimeout(refetchBalance, 1500)
+    try {
+      const tx = await writeContractAsync({
+        address: HERO_CURRENCY_ADDRESS,
+        abi: tokenAbi,
+        functionName: 'faucet',
+        args: [BigInt(250) * BigInt(10) ** BigInt(18)],
+      })
+
+      setHash(tx)
+      setStatus('Hero currency faucet sent. Refreshing balance...')
+      window.setTimeout(refetchBalance, 1500)
+    } catch (error) {
+      setActionError(formatActionError(error))
+      setStatus('Hero currency claim failed.')
+    }
   }
 
   async function applyModule() {
     if (!selectedHeroId) return
 
-    const tx = await writeContractAsync({
-      address: HERO_NFT_ADDRESS,
-      abi: heroNftAbi,
-      functionName: 'applyModule',
-      args: [selectedHeroId, Number(selectedModule)],
-    })
+    setActionError(null)
+    setHash(undefined)
 
-    setHash(tx)
-    setStatus('Module transaction sent. Refreshing hero stats...')
-    setTimeout(() => {
-      refetchNextHeroId()
-      loadHeroes()
-    }, 1500)
+    try {
+      const tx = await writeContractAsync({
+        address: HERO_NFT_ADDRESS,
+        abi: heroNftAbi,
+        functionName: 'applyModule',
+        args: [selectedHeroId, Number(selectedModule)],
+      })
+
+      setHash(tx)
+      setStatus('Module transaction sent. Refreshing hero stats...')
+      window.setTimeout(() => {
+        void refetchNextHeroId()
+        void loadHeroes()
+      }, 1500)
+    } catch (error) {
+      setActionError(formatActionError(error))
+      setStatus('Module upgrade failed.')
+    }
   }
 
   async function enterTournament() {
     if (!selectedHeroId) return
 
-    const tx = await writeContractAsync({
-      address: HERO_NFT_ADDRESS,
-      abi: heroNftAbi,
-      functionName: 'enterTournament',
-      args: [selectedHeroId, stringToHex(tournamentSlug.slice(0, 32), { size: 32 })],
-    })
+    setActionError(null)
+    setHash(undefined)
 
-    setHash(tx)
-    setStatus(`Hero #${selectedHeroId.toString()} entered tournament ${tournamentSlug}.`)
+    try {
+      const tx = await writeContractAsync({
+        address: HERO_NFT_ADDRESS,
+        abi: heroNftAbi,
+        functionName: 'enterTournament',
+        args: [selectedHeroId, stringToHex(tournamentSlug.slice(0, 32), { size: 32 })],
+      })
+
+      setHash(tx)
+      setStatus(`Hero #${selectedHeroId.toString()} entered tournament ${tournamentSlug}.`)
+    } catch (error) {
+      setActionError(formatActionError(error))
+      setStatus('Tournament entry failed.')
+    }
   }
 
   const selectedHero = useMemo(
@@ -379,10 +502,18 @@ export default function HeroesPage() {
     setPackModalOpen(true)
   }
 
-  function handleModalClose() {
+  async function handleModalClose() {
+    if (!publicClient) return
+
     setPackModalOpen(false)
     setPackWinner(null)
     packPendingRef.current = false
+    const refreshedNextHeroId = (await publicClient.readContract({
+      address: HERO_NFT_ADDRESS,
+      abi: heroNftAbi,
+      functionName: 'nextId',
+    }).catch(() => undefined)) as bigint | undefined
+    await loadHeroes(refreshedNextHeroId)
   }
 
   return (
@@ -455,12 +586,19 @@ export default function HeroesPage() {
                 </Notice>
               )}
 
-              {ENABLE_TEST_ACTIONS && (
-                <div className="grid gap-3 rounded-[20px] border border-white/10 bg-black/20 p-4">
+              {actionError && (
+                <Notice tone="red">
+                  <div className="font-semibold text-white">Action blocked</div>
+                  <div>{actionError}</div>
+                </Notice>
+              )}
+
+              {heroCurrencyReady && (
+                <div className="grid gap-3 rounded-[24px] border border-emerald-300/15 bg-[linear-gradient(145deg,rgba(16,185,129,0.16),rgba(2,6,23,0.6))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-sm text-slate-400">Hero currency</div>
-                      <div className="text-lg font-bold text-white">Claim local test balance</div>
+                      <div className="text-sm uppercase tracking-[0.18em] text-emerald-100/70">Hero currency</div>
+                      <div className="text-lg font-bold text-white">Free tokens for packs</div>
                     </div>
                     <button
                       type="button"
@@ -468,21 +606,24 @@ export default function HeroesPage() {
                       disabled={!isConnected || !heroCurrencyReady || txPending}
                       className="rounded-2xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      Claim 250
+                      Free Tokens
                     </button>
                   </div>
                   <div className="text-sm leading-6 text-slate-300">
-                    Local helper for testing <code>buyPack()</code> without manual minting.
+                    Claim a local test balance before buying packs, listing heroes, or entering tournaments.
                   </div>
                 </div>
               )}
 
-              <div className="grid gap-4 rounded-[20px] border border-white/10 bg-black/20 p-4">
+              <div className="grid gap-4 rounded-[24px] border border-teal-300/15 bg-[linear-gradient(160deg,rgba(45,212,191,0.12),rgba(15,23,42,0.74))] p-5 shadow-[0_18px_40px_rgba(8,15,30,0.28)]">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-sm text-slate-400">Цена набора</div>
+                    <div className="text-sm uppercase tracking-[0.18em] text-teal-100/70">Pack price</div>
                     <div className="text-2xl font-black text-white">
                       {packPrice !== undefined ? formatCurrency(packPrice) : '...'}
+                    </div>
+                    <div className="mt-2 max-w-xs text-sm leading-6 text-slate-300">
+                      Buy a hero pack, wait for the chain to mint it, then reveal the hamster when it is ready.
                     </div>
                   </div>
                   <button
@@ -491,7 +632,7 @@ export default function HeroesPage() {
                     disabled={!isConnected || !packContractsReady || txPending || packPurchased}
                     className="rounded-2xl bg-teal-400 px-5 py-3 text-sm font-black text-slate-950 transition hover:-translate-y-0.5 hover:bg-teal-300 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    🎁 Купить набор
+                    Buy Pack
                   </button>
                 </div>
 
@@ -511,7 +652,7 @@ export default function HeroesPage() {
                   ))}
                 </div>
 
-                {/* Open button — only active when actual hero is ready */}
+                {/* Open button only becomes active when the hero is ready */}
                 {packPurchased && (
                   <div className="grid gap-2">
                     {!packWinner && (
@@ -520,7 +661,7 @@ export default function HeroesPage() {
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
                         </svg>
-                        Ждём героя из блокчейна...
+                        Waiting for the hero to arrive from the blockchain...
                       </div>
                     )}
                     <button
@@ -529,7 +670,7 @@ export default function HeroesPage() {
                       disabled={!packWinner}
                       className="w-full rounded-2xl bg-yellow-400 py-4 text-lg font-black text-slate-950 transition hover:-translate-y-0.5 hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-40 animate-pulse disabled:animate-none"
                     >
-                      🎰 Открыть набор!
+                      Open Pack!
                     </button>
                   </div>
                 )}
@@ -543,8 +684,10 @@ export default function HeroesPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={loadHeroes}
-                    disabled={!isConnected || !heroContractsReady || isLoadingHeroes}
+                    onClick={() => {
+                      void loadHeroes()
+                    }}
+                    disabled={!isConnected || !heroContractsReady || isLoadingHeroes || packPurchased || packModalOpen}
                     className="rounded-2xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {isLoadingHeroes ? 'Syncing...' : 'Refresh'}
@@ -629,7 +772,7 @@ export default function HeroesPage() {
                     </div>
 
                     <div className="mt-3 text-xs text-slate-400">
-                      XP {hero.xp} / {xpForNextLevel(hero.level)} · Upgrades {hero.upgradesThisLevel} / {hero.level + 2}
+                      XP {hero.xp} / {xpForNextLevel(hero.level)} | Upgrades {hero.upgradesThisLevel} / {hero.level + 2}
                     </div>
                   </button>
                 )
@@ -755,11 +898,13 @@ function MetricCard({ label, value, hint }: { label: string; value: string; hint
   )
 }
 
-function Notice({ children, tone }: { children: React.ReactNode; tone: 'amber' | 'blue' }) {
+function Notice({ children, tone }: { children: React.ReactNode; tone: 'amber' | 'blue' | 'red' }) {
   const classes =
     tone === 'amber'
       ? 'border-amber-300/20 bg-amber-300/10 text-amber-100'
-      : 'border-sky-300/20 bg-sky-300/10 text-sky-100'
+      : tone === 'red'
+        ? 'border-rose-300/20 bg-[linear-gradient(145deg,rgba(251,113,133,0.16),rgba(127,29,29,0.14))] text-rose-100'
+        : 'border-sky-300/20 bg-sky-300/10 text-sky-100'
 
   return <div className={`rounded-[20px] border px-4 py-3 text-sm leading-6 ${classes}`}>{children}</div>
 }
