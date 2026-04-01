@@ -95,6 +95,7 @@ export function Navbar() {
     { href: '/', label: 'Cities' },
     { href: '/heroes', label: 'Heroes' },
     { href: '/pvp', label: 'PvP' },
+    { href: '/marketplace', label: 'Marketplace' },
   ]
 
   return (
@@ -104,8 +105,8 @@ export function Navbar() {
           C
         </div>
         <div>
-          <div className="text-xl font-black tracking-tight text-white">Crypto Game</div>
-          <div className="text-sm text-slate-400">Cities, heroes, wallet and network</div>
+          <div className="text-xl font-black tracking-tight text-white">Block Empire</div>
+          <div className="text-sm text-slate-400">Build, attack and earn</div>
         </div>
       </div>
 

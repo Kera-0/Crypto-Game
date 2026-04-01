@@ -13,7 +13,7 @@ interface IGameToken {
 contract CityFiled is BuildingFactory, ReentrancyGuard {
     IGameToken public token;
     address public pvpBattles;
-    uint256 public constant MAP_SIZE = 50;
+    uint256 public constant MAP_SIZE = 100;
 
     constructor(address tokenAddress) {
         token = IGameToken(tokenAddress);
@@ -28,7 +28,6 @@ contract CityFiled is BuildingFactory, ReentrancyGuard {
         uint8 level;       
         uint256[12][12][10] fields;
         uint256 power;
-        uint256 defense;
         uint32 x;
         uint32 y;
     }
@@ -49,6 +48,8 @@ contract CityFiled is BuildingFactory, ReentrancyGuard {
 
     event LevelUpgraded(address indexed addr, uint8 level);
     event CityCreated(address indexed owner, uint256 indexed cityId, uint32 x, uint32 y);
+    event PowerGained(uint256 power);
+    event FieldChanged();
 
     function createCity() external {
         require(ownerToCity[msg.sender] == 0, "City already exists");
@@ -133,6 +134,8 @@ contract CityFiled is BuildingFactory, ReentrancyGuard {
 
         building.isActive = true;
         buildingPosition[buildingId] = BuildingPosition(layer, top, left);
+
+        emit FieldChanged();
     }
 
     function moveBuilding(uint8 newLayer, uint8 newTop, uint8 newLeft, uint256 buildingId) external {
@@ -174,6 +177,8 @@ contract CityFiled is BuildingFactory, ReentrancyGuard {
 
         building.isActive = false;
         delete buildingPosition[buildingId];
+
+        emit FieldChanged();
     }
 
     function canPlaceBuilding(
@@ -293,6 +298,8 @@ contract CityFiled is BuildingFactory, ReentrancyGuard {
             City storage city = cities[ownerToCity[msg.sender]];
             city.power += power;
         }
+
+        emit PowerGained(power);
     }
 
     function upgradeLevel() external payable nonReentrant {
@@ -312,11 +319,34 @@ contract CityFiled is BuildingFactory, ReentrancyGuard {
         return cities[cityId].fields[layer][i][j];
     }
 
-    function getCityStats(address owner) external view returns (uint8 level, uint256 power, uint256 defense) {
+    function _getDef(address owner) internal view returns (uint256 d) {
+        uint256[] storage ids = ownerToBuildingIds[owner];
+        uint256 def_ = 0;
+
+        for (uint256 i = 0; i < ids.length; i++) {
+            Building storage b = buildings[ids[i]];
+
+            if (b.isActive && _getBuildingType(b.dna) == 2) {
+                def_ += 10 * b.level;
+            }
+        }
+        return def_;
+    }
+
+    function getCityStats(address owner) external view returns (uint8 level, uint256 power, uint256 _def) {
         uint256 cityId = ownerToCity[owner];
         require(cityId != 0, "No city");
         City storage c = cities[cityId];
-        return (c.level, c.power, c.defense);
+        uint256 def_ = _getDef(owner);
+        return (c.level, c.power, def_);
+    }
+
+    function getUpgradeLevelPrice() external view returns (uint256) {
+        uint256 cityId = ownerToCity[msg.sender];
+        City memory city = cities[cityId];
+        
+        uint8 cityLevel = city.level;
+        return levelUpPrice[cityLevel];
     }
 
     function getAllCityOwners() external view returns (address[] memory owners) {

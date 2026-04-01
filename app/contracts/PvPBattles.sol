@@ -130,9 +130,9 @@ contract PvPBattles {
                 keccak256(abi.encodePacked(attacker, defender, rounds, attackerTurn))
             );
             if (attackerTurn) {
-                d.hp -= _hit(a, d, salt);
+                d.hp -= _hit(a, d, salt, attacker, defender);
             } else {
-                a.hp -= _hit(d, a, salt);
+                a.hp -= _hit(d, a, salt, defender, attacker);
             }
             attackerTurn = !attackerTurn;
         }
@@ -168,7 +168,9 @@ contract PvPBattles {
     function _hit(
         SumStats memory a,
         SumStats memory b,
-        uint256 salt
+        uint256 salt,
+        address attacker,
+        address defender
     ) internal view returns (uint256) {
         uint256 randomWord = uint256(
             keccak256(abi.encodePacked(block.prevrandao, block.timestamp, block.number, msg.sender, salt))
@@ -177,10 +179,10 @@ contract PvPBattles {
         uint256 atk = a.atk;
         uint256 def_ = b.def_;
 
-        if (a.lck >= (uint256(keccak256(abi.encode(randomWord, "A"))) % 100)) {
+        if (a.lck >= (uint256(keccak256(abi.encode(randomWord, "A"))) % 100) * heroes.heroIdsOf(attacker).length) {
             atk *= 2;
         }
-        if (b.lck >= (uint256(keccak256(abi.encode(randomWord, "D"))) % 100)) {
+        if (b.lck >= (uint256(keccak256(abi.encode(randomWord, "D"))) % 100) * heroes.heroIdsOf(defender).length) {
             def_ *= 2;
         }
 

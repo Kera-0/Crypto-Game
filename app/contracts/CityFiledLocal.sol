@@ -16,6 +16,8 @@ contract CityFiledLocal is CityFiled {
         _mintStarterBuilding(msg.sender, 0, 0x00B, 2);
         _mintStarterBuilding(msg.sender, 1, 0x00F, 3);
         _mintStarterBuilding(msg.sender, 1, 0x013, 4);
+        _mintStarterBuilding(msg.sender, 2, 0x00F, 5);
+        _mintStarterBuilding(msg.sender, 2, 0x013, 6);
     }
 
     function _mintStarterBuilding(address to, uint8 buildingType, uint16 shapeMask, uint64 lookSeed) internal {

@@ -6,6 +6,8 @@ export const HERO_CURRENCY_ADDRESS = (process.env.NEXT_PUBLIC_HERO_CURRENCY_ADDR
 export const HERO_NFT_ADDRESS = (process.env.NEXT_PUBLIC_HERO_NFT_ADDRESS ?? ZERO_ADDRESS) as `0x${string}`
 export const PACK_OPENER_ADDRESS = (process.env.NEXT_PUBLIC_PACK_OPENER_ADDRESS ?? ZERO_ADDRESS) as `0x${string}`
 export const PVP_BATTLES_ADDRESS = (process.env.NEXT_PUBLIC_PVP_BATTLES_ADDRESS ?? ZERO_ADDRESS) as `0x${string}`
+export const HERO_MARKETPLACE_ADDRESS = (process.env.NEXT_PUBLIC_HERO_MARKETPLACE_ADDRESS ?? ZERO_ADDRESS) as `0x${string}`
+export const ENABLE_TEST_ACTIONS = process.env.NEXT_PUBLIC_ENABLE_TEST_ACTIONS === 'true'
 
 export function isConfiguredAddress(address: `0x${string}`) {
   return /^0x[a-fA-F0-9]{40}$/.test(address) && address.toLowerCase() !== ZERO_ADDRESS
@@ -44,6 +46,16 @@ export const cityAbi = [
       { name: 'j', type: 'uint8' },
     ],
     outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'getCityStats',
+    stateMutability: 'view',
+    inputs: [{ name: 'owner', type: 'address' }],
+    outputs: [
+      { name: 'level', type: 'uint8' },
+      { name: 'power', type: 'uint256' },
+    ],
   },
   {
     type: 'function',
@@ -109,6 +121,13 @@ export const cityAbi = [
     stateMutability: 'payable',
     inputs: [],
     outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'getUpgradeLevelPrice',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
   },
   {
     type: 'function',
@@ -209,6 +228,27 @@ export const cityAbi = [
       { name: 'defense', type: 'uint256' },
     ],
   },
+  {
+    type: 'event',
+    name: 'PowerGained',
+    anonymous: false,
+    inputs: [{ name: 'power', type: 'uint256', indexed: false }],
+  },
+  {
+    type: 'event',
+    name: 'FieldChanged',
+    anonymous: false,
+    inputs: [],
+  },
+  {
+    type: 'event',
+    name: 'LevelUpgraded',
+    anonymous: false,
+    inputs: [
+      { name: 'addr', type: 'address', indexed: true },
+      { name: 'level', type: 'uint8', indexed: false },
+    ],
+  },
 ] as const
 
 export const tokenAbi = [
@@ -260,6 +300,23 @@ export const heroNftAbi = [
   {
     type: 'function',
     name: 'ownerOf',
+    stateMutability: 'view',
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    outputs: [{ name: '', type: 'address' }],
+  },
+  {
+    type: 'function',
+    name: 'approve',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'to', type: 'address' },
+      { name: 'tokenId', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'getApproved',
     stateMutability: 'view',
     inputs: [{ name: 'tokenId', type: 'uint256' }],
     outputs: [{ name: '', type: 'address' }],
@@ -449,5 +506,83 @@ export const pvpBattlesAbi = [
       { name: 'travelTimeSeconds', type: 'uint256', indexed: false },
     ],
     anonymous: false,
+  },
+] as const
+
+export const heroMarketplaceAbi = [
+  {
+    type: 'function',
+    name: 'feeBps',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint16' }],
+  },
+  {
+    type: 'function',
+    name: 'activeListingCount',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  { 
+    type: 'function',
+    name: 'list',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'tokenId', type: 'uint256' },
+      { name: 'price', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+  { 
+    type: 'function',
+    name: 'updatePrice',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'tokenId', type: 'uint256' },
+      { name: 'newPrice', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'cancel',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'buy',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'listings',
+    stateMutability: 'view',
+    inputs: [{ name: '', type: 'uint256' }],
+    outputs: [
+      { name: 'seller', type: 'address' },
+      { name: 'price', type: 'uint256' },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'getActiveListings',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [
+      {
+        name: 'items',
+        type: 'tuple[]',
+        components: [
+          { name: 'tokenId', type: 'uint256' },
+          { name: 'seller', type: 'address' },
+          { name: 'price', type: 'uint256' },
+        ],
+      },
+    ],
   },
 ] as const

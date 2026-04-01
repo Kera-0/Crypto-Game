@@ -342,7 +342,8 @@ export default function PvPPage() {
   const lockUntilRawSec = toNumOrNull(lockedUntil)
   const cooldownSec =
     lockUntilStableSec !== null && lockUntilStableSec > 0 ? Math.max(0, lockUntilStableSec - nowSec) : 0
-  const canAttack = isConnected && pvpReady && cooldownSec <= 0 && !txPending
+  const hasCity = !!myBattleProfile?.coord
+  const canAttack = isConnected && pvpReady && hasCity && cooldownSec <= 0 && !txPending
 
   const roundStartRawSec = toNumOrNull(roundStartedAt)
   const periodSec = toNumOrNull(tournamentPeriodSec)
@@ -506,9 +507,8 @@ export default function PvPPage() {
           chainNowBaseSecRef.current = safeTs
           chainNowBaseMsRef.current = nowMs
           setNowSec((prev) => {
-            const localNow = Math.floor(nowMs / 1000)
-            const floorPrev = Number.isFinite(prev) ? prev : localNow
-            return Math.max(floorPrev, localNow, safeTs)
+            const floorPrev = Number.isFinite(prev) ? prev : safeTs
+            return Math.max(floorPrev, safeTs)
           })
         }
       } catch {
@@ -526,7 +526,8 @@ export default function PvPPage() {
           baseSec > 0 && baseMs > 0 ? baseSec + Math.floor((nowMs - baseMs) / 1000) : 0
         const fallback = Math.floor(nowMs / 1000)
         const floorPrev = Number.isFinite(prev) ? prev : fallback
-        return Math.max(floorPrev, fromChain, fallback)
+        if (fromChain > 0) return Math.max(floorPrev, fromChain)
+        return Math.max(floorPrev, fallback)
       })
     }, 1000)
 
@@ -700,6 +701,7 @@ export default function PvPPage() {
   ])
 
   async function attack(player: `0x${string}`) {
+    if (!hasCity) return
     try {
       const tx = await writeContractAsync({
         address: PVP_BATTLES_ADDRESS,
@@ -921,6 +923,43 @@ export default function PvPPage() {
 
   const resetMapView = useCallback(() => setMapTransform({ tx: 0, ty: 0, s: 1 }), [])
 
+  useEffect(() => {
+    const svg = mapSvgRef.current
+    if (!svg) return
+
+    const applyCenterOnMap = () => {
+      const rect = svg.getBoundingClientRect()
+      if (!Number.isFinite(rect.width) || !Number.isFinite(rect.height) || rect.width <= 0 || rect.height <= 0) {
+        return false
+      }
+      const ctm = svg.getScreenCTM()
+      if (!ctm) return false
+
+      const corner = svg.createSVGPoint()
+      corner.x = rect.left + rect.width / 2
+      corner.y = rect.top + rect.height / 2
+      const userCenter = corner.matrixTransform(ctm.inverse())
+
+      const s = Math.min(MAP_ZOOM_MAX, Math.max(MAP_ZOOM_MIN, 1))
+      const px = mapModel.w / 2
+      const py = mapModel.h / 2
+      setMapTransform({
+        s,
+        tx: userCenter.x - px * s,
+        ty: userCenter.y - py * s,
+      })
+      return true
+    }
+
+    if (applyCenterOnMap()) return
+
+    const ro = new ResizeObserver(() => {
+      if (applyCenterOnMap()) ro.disconnect()
+    })
+    ro.observe(svg)
+    return () => ro.disconnect()
+  }, [mapModel.w, mapModel.h])
+
   const handleMapPointerDown = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
       if (e.button !== 0) return
@@ -981,8 +1020,14 @@ export default function PvPPage() {
           <svg
             ref={mapSvgRef}
             width="100%"
+            height="100%"
             viewBox={`0 0 ${mapModel.w} ${mapModel.h}`}
-            style={{ display: 'block', touchAction: 'none', cursor: mapIsPanning ? 'grabbing' : 'default' }}
+            preserveAspectRatio="xMidYMid meet"
+            style={{
+              display: 'block',
+              touchAction: 'none',
+              cursor: mapIsPanning ? 'grabbing' : 'default',
+            }}
             onPointerDown={handleMapPointerDown}
             onPointerMove={handleMapPointerMove}
             onPointerUp={handleMapPointerUp}
@@ -1180,6 +1225,15 @@ export default function PvPPage() {
                     strokeDasharray="7 9"
                     strokeLinecap="round"
                   />
+                  <circle
+                    cx={attackAnim.x}
+                    cy={attackAnim.y}
+                    r="16"
+                    fill="rgba(2, 6, 23, 0.52)"
+                    stroke="rgba(251, 191, 36, 0.92)"
+                    strokeWidth="2"
+                    style={{ filter: 'drop-shadow(0 10px 14px rgba(2, 6, 23, 0.25))' }}
+                  />
                   <text
                     x={attackAnim.x}
                     y={attackAnim.y}
@@ -1234,8 +1288,8 @@ export default function PvPPage() {
                   <div style={{ ...mini, marginBottom: 10, marginLeft: -6 }}>
                     <div style={{ fontSize: 12, opacity: 0.7 }}>Your city</div>
                     <div>Level: {myBattleProfile.city?.level ?? '—'}</div>
-                    <div>Power: {myBattleProfile.city ? formatEther(myBattleProfile.city.power) : '—'}</div>
-                    <div>Defense: {myBattleProfile.city ? formatEther(myBattleProfile.city.defense) : '—'}</div>
+                      <div>Power: {myBattleProfile.city ? myBattleProfile.city.power.toString() : '—'}</div>
+                      <div>Defense: {myBattleProfile.city ? myBattleProfile.city.defense.toString() : '—'}</div>
                   </div>
                   <div style={{ ...mini, marginLeft: -6 }}>
                     <div style={{ fontSize: 12, opacity: 0.7 }}>Your heroes</div>
@@ -1303,8 +1357,8 @@ export default function PvPPage() {
               <div style={{ ...mini, marginLeft: -6 }}>
                 <div style={{ fontSize: 12, opacity: 0.7 }}>City</div>
                 <div>Level: {selected.city?.level ?? '—'}</div>
-                <div>Power: {selected.city ? formatEther(selected.city.power) : '—'}</div>
-                <div>Defense: {selected.city ? formatEther(selected.city.defense) : '—'}</div>
+                <div>Power: {selected.city ? selected.city.power.toString() : '—'}</div>
+                <div>Defense: {selected.city ? selected.city.defense.toString() : '—'}</div>
               </div>
               <div style={{ ...mini, marginLeft: -6 }}>
                 <div style={{ fontSize: 12, opacity: 0.7 }}>Heroes</div>

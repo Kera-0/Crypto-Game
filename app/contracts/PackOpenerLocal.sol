@@ -35,12 +35,15 @@ contract PackOpenerLocal {
         currency.spendFrom(msg.sender, packPrice);
         emit PackBought(msg.sender, packPrice);
 
+        // On Hardhat block.prevrandao is always 0 — add gasleft() + tx.gasprice for entropy
         uint256 randomWord = uint256(
             keccak256(
                 abi.encode(
                     block.prevrandao,
                     block.timestamp,
                     block.number,
+                    gasleft(),
+                    tx.gasprice,
                     msg.sender,
                     heroes.nextId()
                 )
@@ -56,9 +59,10 @@ contract PackOpenerLocal {
 
     function _rollRarity(uint256 word) internal pure returns (HeroNFT.Rarity) {
         uint256 x = word % 100;
-        if (x < 75) return HeroNFT.Rarity.Common;
-        if (x < 95) return HeroNFT.Rarity.Rare;
-        if (x < 99) return HeroNFT.Rarity.Epic;
+        // Local test probabilities: 40% Common, 30% Rare, 20% Epic, 10% Legendary
+        if (x < 40) return HeroNFT.Rarity.Common;
+        if (x < 70) return HeroNFT.Rarity.Rare;
+        if (x < 90) return HeroNFT.Rarity.Epic;
         return HeroNFT.Rarity.Legendary;
     }
 
