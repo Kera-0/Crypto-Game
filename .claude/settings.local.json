@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls C:/Users/fan1g/project/Crypto-Game/frontend/.env*)",
+      "Bash(ls C:/Users/fan1g/project/Crypto-Game/.env*)",
+      "Bash(docker --version)",
+      "Bash(docker compose:*)",
+      "Bash(make hh:*)",
+      "Bash(docker exec hardhat:*)",
+      "Bash(docker cp:*)",
+      "Bash(make run:*)",
+      "Bash(docker restart:*)",
+      "Bash(python3 -c ':*)",
+      "Bash(python -c ':*)",
+      "Bash(node -e ':*)",
+      "Bash(node:*)",
+      "Bash(unzip -l hamsters_separate_png.zip)",
+      "Bash(unzip -o hamsters_separate_png.zip -d /c/Users/fan1g/project/Crypto-Game/frontend/public/hamsters/)",
+      "Bash(docker rm:*)"
+    ]
+  }
+}

@@ -1,9 +1,12 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatUnits, stringToHex, type PublicClient } from 'viem'
 import { useAccount, usePublicClient, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { Navbar } from '@/components/navbar'
+import { HamsterAvatar, RARITY_THEMES } from '@/components/HamsterAvatar'
+import { PackOpeningModal } from '@/components/PackOpeningModal'
+import type { HeroSnapshot } from '@/components/HamsterAvatar'
 import {
   ENABLE_TEST_ACTIONS,
   HERO_CURRENCY_ADDRESS,
@@ -161,6 +164,11 @@ export default function HeroesPage() {
   const [tournamentSlug, setTournamentSlug] = useState('alpha-cup')
   const [status, setStatus] = useState('Ready to sync hero contracts.')
   const [hash, setHash] = useState<`0x${string}` | undefined>()
+  const [packModalOpen, setPackModalOpen] = useState(false)
+  const [packPurchased, setPackPurchased] = useState(false)
+  const [packWinner, setPackWinner] = useState<HeroSnapshot | null>(null)
+  const heroIdsBeforeRef = useRef<Set<string>>(new Set())
+  const packPendingRef = useRef(false)
 
   const heroContractsReady = isConfiguredAddress(HERO_NFT_ADDRESS)
   const packContractsReady = isConfiguredAddress(PACK_OPENER_ADDRESS)
@@ -227,6 +235,15 @@ export default function HeroesPage() {
         return nextHeroes[0]?.id ?? null
       })
       setStatus(`Synced ${nextHeroes.length} hero${nextHeroes.length === 1 ? '' : 'es'} from chain.`)
+
+      // If pack opening is pending — find the new hero and set as winner
+      if (packPendingRef.current) {
+        const newHero = nextHeroes.find((h) => !heroIdsBeforeRef.current.has(h.id.toString()))
+        if (newHero) {
+          setPackWinner(newHero)
+          packPendingRef.current = false
+        }
+      }
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Failed to load hero roster.')
     } finally {
@@ -280,6 +297,11 @@ export default function HeroesPage() {
   }, [address, heroContractsReady, nextHeroId, publicClient])
 
   async function buyPack() {
+    // Save current hero IDs before buying
+    heroIdsBeforeRef.current = new Set(heroes.map((h) => h.id.toString()))
+    packPendingRef.current = true
+    setPackWinner(null)
+
     const tx = await writeContractAsync({
       address: PACK_OPENER_ADDRESS,
       abi: packOpenerAbi,
@@ -288,11 +310,14 @@ export default function HeroesPage() {
     })
 
     setHash(tx)
-    setStatus('Pack purchased. Waiting for VRF fulfillment to mint the hero...')
+    setPackPurchased(true)
+    setStatus('Pack purchased! Click "Open" to reveal your hamster.')
+
+    // Load heroes after VRF resolves (local: instant, mainnet: ~30s)
     setTimeout(() => {
       refetchBalance()
       refetchNextHeroId()
-      loadHeroes()
+      void loadHeroes()
     }, 4000)
   }
 
@@ -349,7 +374,22 @@ export default function HeroesPage() {
   const xpProgress = selectedHero ? Math.min(selectedHero.xp / xpForNextLevel(selectedHero.level), 1) : 0
   const upgradesLimit = selectedHero ? selectedHero.level + 2 : 0
 
+  function handleOpenPack() {
+    setPackPurchased(false)
+    setPackModalOpen(true)
+  }
+
+  function handleModalClose() {
+    setPackModalOpen(false)
+    setPackWinner(null)
+    packPendingRef.current = false
+  }
+
   return (
+    <>
+    {packModalOpen && (
+      <PackOpeningModal winner={packWinner} onClose={handleModalClose} />
+    )}
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.18),transparent_28%),radial-gradient(circle_at_top_right,rgba(249,115,22,0.14),transparent_24%),linear-gradient(180deg,#07131a_0%,#0d1724_42%,#111827_100%)] px-4 py-6 text-white sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
         <Navbar />
@@ -437,10 +477,10 @@ export default function HeroesPage() {
                 </div>
               )}
 
-              <div className="grid gap-3 rounded-[20px] border border-white/10 bg-black/20 p-4">
+              <div className="grid gap-4 rounded-[20px] border border-white/10 bg-black/20 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-sm text-slate-400">Pack price</div>
+                    <div className="text-sm text-slate-400">Цена набора</div>
                     <div className="text-2xl font-black text-white">
                       {packPrice !== undefined ? formatCurrency(packPrice) : '...'}
                     </div>
@@ -448,15 +488,51 @@ export default function HeroesPage() {
                   <button
                     type="button"
                     onClick={buyPack}
-                    disabled={!isConnected || !packContractsReady || txPending}
+                    disabled={!isConnected || !packContractsReady || txPending || packPurchased}
                     className="rounded-2xl bg-teal-400 px-5 py-3 text-sm font-black text-slate-950 transition hover:-translate-y-0.5 hover:bg-teal-300 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Buy Hero Pack
+                    🎁 Купить набор
                   </button>
                 </div>
-                <div className="text-sm leading-6 text-slate-300">
-                  After purchase the contract waits for Chainlink VRF callback, then mints the hero through <code>HeroNFT.mintHero</code>.
+
+                {/* Drop chances */}
+                <div className="grid grid-cols-5 gap-1.5 text-center">
+                  {[
+                    { label: 'Common',    pct: '55%', color: '#94a3b8' },
+                    { label: 'Rare',      pct: '22%', color: '#38bdf8' },
+                    { label: 'Epic',      pct: '13%', color: '#c084fc' },
+                    { label: 'Legendary', pct: '7%',  color: '#facc15' },
+                    { label: 'Mythic',    pct: '3%',  color: '#f87171' },
+                  ].map(({ label, pct, color }) => (
+                    <div key={label} className="rounded-xl bg-white/5 px-1 py-2">
+                      <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color }}>{label}</div>
+                      <div className="mt-1 text-base font-black text-white">{pct}</div>
+                    </div>
+                  ))}
                 </div>
+
+                {/* Open button — only active when actual hero is ready */}
+                {packPurchased && (
+                  <div className="grid gap-2">
+                    {!packWinner && (
+                      <div className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 py-3 text-sm text-slate-400">
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                        </svg>
+                        Ждём героя из блокчейна...
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleOpenPack}
+                      disabled={!packWinner}
+                      className="w-full rounded-2xl bg-yellow-400 py-4 text-lg font-black text-slate-950 transition hover:-translate-y-0.5 hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-40 animate-pulse disabled:animate-none"
+                    >
+                      🎰 Открыть набор!
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="grid gap-3 rounded-[20px] border border-white/10 bg-black/20 p-4">
@@ -506,6 +582,7 @@ export default function HeroesPage() {
 
               {heroes.map((hero) => {
                 const rarity = rarityMeta[hero.rarity] ?? rarityMeta[0]
+                const rt = RARITY_THEMES[Math.min(hero.rarity, RARITY_THEMES.length - 1)] ?? RARITY_THEMES[0]!
                 const isSelected = selectedHeroId === hero.id
                 return (
                   <button
@@ -514,34 +591,45 @@ export default function HeroesPage() {
                     onClick={() => setSelectedHeroId(hero.id)}
                     className="rounded-[24px] border p-5 text-left transition hover:-translate-y-1"
                     style={{
-                      borderColor: isSelected ? rarity.accent : 'rgba(255,255,255,0.08)',
-                      background: `linear-gradient(180deg, ${rarity.glow} 0%, rgba(15,23,42,0.86) 100%)`,
-                      boxShadow: isSelected ? `0 22px 55px ${rarity.glow}` : 'none',
+                      borderColor: rt.ring,
+                      borderWidth: isSelected ? 2 : 1,
+                      background: isSelected
+                        ? `linear-gradient(160deg, ${rt.bg} 0%, rgba(8,12,24,0.97) 100%)`
+                        : `linear-gradient(160deg, rgba(255,255,255,0.03) 0%, rgba(8,12,24,0.95) 100%)`,
+                      boxShadow: isSelected
+                        ? `0 0 0 3px ${rt.ring}44, 0 0 28px ${rt.glow}, 0 8px 32px rgba(0,0,0,0.6)`
+                        : `0 0 10px ${rt.ring}22, inset 0 0 1px ${rt.ring}33`,
                     }}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">{rarity.name}</div>
-                        <div className="mt-2 text-2xl font-black text-white">Hero #{hero.id.toString()}</div>
+                    <div className="flex items-center gap-4">
+                      <div className="shrink-0 rounded-[16px] overflow-hidden" style={{ boxShadow: `0 0 18px ${rarity.glow}` }}>
+                        <HamsterAvatar hero={hero} size={88} />
                       </div>
-                      <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200">
-                        LVL {hero.level}
-                      </div>
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-5 gap-2 text-center">
-                      {statLabels.map((stat) => (
-                        <div key={stat} className="rounded-2xl bg-black/20 px-2 py-3">
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                            {stat.replace('_', '')}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">{rarity.name}</div>
+                            <div className="mt-1 text-xl font-black text-white">Hero #{hero.id.toString()}</div>
                           </div>
-                          <div className="mt-2 text-lg font-black text-white">{hero.total[stat]}</div>
+                          <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200">
+                            LVL {hero.level}
+                          </div>
                         </div>
-                      ))}
+                        <div className="mt-3 grid grid-cols-5 gap-1 text-center">
+                          {statLabels.map((stat) => (
+                            <div key={stat} className="rounded-xl bg-black/20 px-1 py-2">
+                              <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-400">
+                                {stat.replace('_', '')}
+                              </div>
+                              <div className="mt-1 text-base font-black text-white">{hero.total[stat]}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="mt-4 text-sm text-slate-300">
-                      XP {hero.xp} / {xpForNextLevel(hero.level)} | Upgrades {hero.upgradesThisLevel} / {hero.level + 2}
+                    <div className="mt-3 text-xs text-slate-400">
+                      XP {hero.xp} / {xpForNextLevel(hero.level)} · Upgrades {hero.upgradesThisLevel} / {hero.level + 2}
                     </div>
                   </button>
                 )
@@ -557,6 +645,14 @@ export default function HeroesPage() {
 
             {selectedHero ? (
               <div className="mt-5 grid gap-5">
+                <div className="flex justify-center">
+                  <div
+                    className="rounded-[24px] overflow-hidden"
+                    style={{ boxShadow: `0 0 40px ${(RARITY_THEMES[Math.min(selectedHero.rarity, RARITY_THEMES.length-1)] ?? RARITY_THEMES[0]!).glow}` }}
+                  >
+                    <HamsterAvatar hero={selectedHero} size={160} />
+                  </div>
+                </div>
                 <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">Progress</div>
@@ -645,6 +741,7 @@ export default function HeroesPage() {
         </section>
       </div>
     </main>
+    </>
   )
 }
 
