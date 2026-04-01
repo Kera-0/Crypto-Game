@@ -5,6 +5,7 @@ import { formatUnits, stringToHex, type PublicClient } from 'viem'
 import { useAccount, usePublicClient, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { Navbar } from '@/components/navbar'
 import {
+  ENABLE_TEST_ACTIONS,
   HERO_CURRENCY_ADDRESS,
   HERO_NFT_ADDRESS,
   PACK_OPENER_ADDRESS,
@@ -414,25 +415,27 @@ export default function HeroesPage() {
                 </Notice>
               )}
 
-              <div className="grid gap-3 rounded-[20px] border border-white/10 bg-black/20 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm text-slate-400">Hero currency</div>
-                    <div className="text-lg font-bold text-white">Claim local test balance</div>
+              {ENABLE_TEST_ACTIONS && (
+                <div className="grid gap-3 rounded-[20px] border border-white/10 bg-black/20 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm text-slate-400">Hero currency</div>
+                      <div className="text-lg font-bold text-white">Claim local test balance</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={claimHeroCurrency}
+                      disabled={!isConnected || !heroCurrencyReady || txPending}
+                      className="rounded-2xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Claim 250
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={claimHeroCurrency}
-                    disabled={!isConnected || !heroCurrencyReady || txPending}
-                    className="rounded-2xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Claim 250
-                  </button>
+                  <div className="text-sm leading-6 text-slate-300">
+                    Local helper for testing <code>buyPack()</code> without manual minting.
+                  </div>
                 </div>
-                <div className="text-sm leading-6 text-slate-300">
-                  Local helper for testing <code>buyPack()</code> without manual minting.
-                </div>
-              </div>
+              )}
 
               <div className="grid gap-3 rounded-[20px] border border-white/10 bg-black/20 p-4">
                 <div className="flex items-center justify-between gap-3">

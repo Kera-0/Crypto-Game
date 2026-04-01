@@ -5,6 +5,7 @@ export const TOKEN_ADDRESS = (process.env.NEXT_PUBLIC_TOKEN_ADDRESS ?? '0x5fbdb2
 export const HERO_CURRENCY_ADDRESS = (process.env.NEXT_PUBLIC_HERO_CURRENCY_ADDRESS ?? ZERO_ADDRESS) as `0x${string}`
 export const HERO_NFT_ADDRESS = (process.env.NEXT_PUBLIC_HERO_NFT_ADDRESS ?? ZERO_ADDRESS) as `0x${string}`
 export const PACK_OPENER_ADDRESS = (process.env.NEXT_PUBLIC_PACK_OPENER_ADDRESS ?? ZERO_ADDRESS) as `0x${string}`
+export const ENABLE_TEST_ACTIONS = process.env.NEXT_PUBLIC_ENABLE_TEST_ACTIONS === 'true'
 
 export function isConfiguredAddress(address: `0x${string}`) {
   return /^0x[a-fA-F0-9]{40}$/.test(address) && address.toLowerCase() !== ZERO_ADDRESS

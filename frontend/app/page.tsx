@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { decodeEventLog, formatEther } from 'viem'
 import { useAccount, usePublicClient, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { Navbar } from '@/components/navbar'
-import { CITY_ADDRESS, TOKEN_ADDRESS, cityAbi, tokenAbi } from '@/lib/contracts'
+import { CITY_ADDRESS, ENABLE_TEST_ACTIONS, TOKEN_ADDRESS, cityAbi, tokenAbi } from '@/lib/contracts'
 
 type Cell = {
   row: number
