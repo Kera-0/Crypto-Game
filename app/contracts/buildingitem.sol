@@ -87,12 +87,34 @@ contract BuildingItem is Ownable {
     }
 
     function _getBuildingShapeMask(uint64 dna) internal pure returns (uint16) {
-        return uint16((dna >> 5) & 0x1FF);
+        return _normalizeShapeMask(uint16((dna >> 5) & 0x1FF));
     }
 
     function _hasShapeBit(uint16 mask, uint8 row, uint8 col) internal pure returns (bool) {
         uint8 shift = 8 - (row * 3 + col);
         return ((mask >> shift) & 1) == 1;
+    }
+
+    function _normalizeShapeMask(uint16 mask) internal pure returns (uint16) {
+        if (mask == 0) return 0;
+
+        while ((mask & 0x1C0) == 0) {
+            mask <<= 3;
+        }
+
+        while ((mask & 0x124) == 0) {
+            uint16 normalized = 0;
+
+            for (uint8 row = 0; row < 3; row++) {
+                uint16 rowBits = (mask >> ((2 - row) * 3)) & 0x7;
+                rowBits <<= 1;
+                normalized |= rowBits << ((2 - row) * 3);
+            }
+
+            mask = normalized & 0x1FF;
+        }
+
+        return mask & 0x1FF;
     }
 
 

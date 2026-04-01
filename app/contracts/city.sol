@@ -198,8 +198,6 @@ contract CityFiled is BuildingFactory, ReentrancyGuard {
         Building storage building = buildings[buildingId];
 
         if (layer > city.level) return false;
-        if (top + 2 >= city.fields[layer].length) return false;
-        if (left + 2 >= city.fields[layer][top].length) return false;
 
         uint16 mask = _getBuildingShapeMask(building.dna);
         if (mask == 0) return false;
@@ -207,6 +205,12 @@ contract CityFiled is BuildingFactory, ReentrancyGuard {
         for (uint8 r = 0; r < 3; r++) {
             for (uint8 c = 0; c < 3; c++) {
                 if (_hasShapeBit(mask, r, c)) {
+                    if (top + r >= city.fields[layer].length) {
+                        return false;
+                    }
+                    if (left + c >= city.fields[layer][top + r].length) {
+                        return false;
+                    }
                     if (city.fields[layer][top + r][left + c] != 0) {
                         return false;
                     }
@@ -225,8 +229,6 @@ contract CityFiled is BuildingFactory, ReentrancyGuard {
         uint8 left
     ) internal view {
         require(layer <= city.level, "Invalid layer");
-        require(top + 2 < city.fields[layer].length, "Out of bounds");
-        require(left + 2 < city.fields[layer][top].length, "Out of bounds");
 
         uint16 mask = _getBuildingShapeMask(dna);
         require(mask != 0, "Empty building shape");
@@ -234,6 +236,8 @@ contract CityFiled is BuildingFactory, ReentrancyGuard {
         for (uint8 r = 0; r < 3; r++) {
             for (uint8 c = 0; c < 3; c++) {
                 if (_hasShapeBit(mask, r, c)) {
+                    require(top + r < city.fields[layer].length, "Out of bounds");
+                    require(left + c < city.fields[layer][top + r].length, "Out of bounds");
                     require(city.fields[layer][top + r][left + c] == 0, "Collision");
                 }
             }
@@ -379,3 +383,4 @@ contract CityFiled is BuildingFactory, ReentrancyGuard {
         }
     }
 }
+

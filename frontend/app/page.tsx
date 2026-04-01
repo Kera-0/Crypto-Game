@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { decodeEventLog, formatEther } from 'viem'
 import { useAccount, usePublicClient, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { Navbar } from '@/components/navbar'
@@ -91,12 +91,34 @@ function getBuildingType(dna: bigint) {
 }
 
 function getBuildingShapeMask(dna: bigint) {
-  return Number((dna >> BigInt(5)) & BigInt(0x1ff))
+  return normalizeShapeMask(Number((dna >> BigInt(5)) & BigInt(0x1ff)))
 }
 
 function hasShapeBit(mask: number, row: number, col: number) {
   const shift = 8 - (row * 3 + col)
   return ((mask >> shift) & 1) === 1
+}
+
+function normalizeShapeMask(mask: number) {
+  if (mask === 0) return 0
+
+  while ((mask & 0x1c0) === 0) {
+    mask = (mask << 3) & 0x1ff
+  }
+
+  while ((mask & 0x124) === 0) {
+    let normalized = 0
+
+    for (let row = 0; row < 3; row += 1) {
+      const shift = (2 - row) * 3
+      const rowBits = (mask >> shift) & 0x7
+      normalized |= ((rowBits << 1) & 0x7) << shift
+    }
+
+    mask = normalized & 0x1ff
+  }
+
+  return mask
 }
 
 function getOccupiedCells(mask: number) {
@@ -113,17 +135,30 @@ function getOccupiedCells(mask: number) {
   return cells
 }
 
-function getBuildingPalette(seed: bigint): BuildingPalette {
-  const palettes: BuildingPalette[] = [
-    { roof: '#d97706', roofAccent: '#fbbf24', wall: '#fde68a', wallShadow: '#f59e0b', trim: '#7c2d12' },
-    { roof: '#b91c1c', roofAccent: '#fb7185', wall: '#fecaca', wallShadow: '#ef4444', trim: '#7f1d1d' },
-    { roof: '#2563eb', roofAccent: '#60a5fa', wall: '#bfdbfe', wallShadow: '#1d4ed8', trim: '#172554' },
-    { roof: '#7c3aed', roofAccent: '#c4b5fd', wall: '#ddd6fe', wallShadow: '#8b5cf6', trim: '#4c1d95' },
-    { roof: '#0f766e', roofAccent: '#2dd4bf', wall: '#ccfbf1', wallShadow: '#14b8a6', trim: '#134e4a' },
-    { roof: '#4d7c0f', roofAccent: '#bef264', wall: '#ecfccb', wallShadow: '#84cc16', trim: '#365314' },
+function getBuildingLookSeed(dna: bigint): number {
+  return Number((dna >> BigInt(14)) & BigInt(0xffff))
+}
+
+function getBuildingTypePalette(buildingType: number, lookSeed: number): BuildingPalette {
+  const minePalettes: BuildingPalette[] = [
+    { roof: '#57534e', roofAccent: '#a8a29e', wall: '#c4b08a', wallShadow: '#44403c', trim: '#1c1510' },
+    { roof: '#6b7280', roofAccent: '#9ca3af', wall: '#d0cec8', wallShadow: '#424242', trim: '#1a1a1a' },
+    { roof: '#78350f', roofAccent: '#b45309', wall: '#d4b08a', wallShadow: '#7c2d12', trim: '#431407' },
+  ]
+  const barracksPalettes: BuildingPalette[] = [
+    { roof: '#4a5e22', roofAccent: '#6b8a33', wall: '#c8d890', wallShadow: '#313e17', trim: '#151a09' },
+    { roof: '#8b4a0a', roofAccent: '#c47220', wall: '#e8c47a', wallShadow: '#5c2e04', trim: '#2e1602' },
+    { roof: '#1a3a5c', roofAccent: '#2862a0', wall: '#a8c8ec', wallShadow: '#0e2238', trim: '#060e18' },
+  ]
+  const towerPalettes: BuildingPalette[] = [
+    { roof: '#3c4a5c', roofAccent: '#6080a0', wall: '#c8d8e8', wallShadow: '#2a3644', trim: '#0e1520' },
+    { roof: '#2a2060', roofAccent: '#4840b0', wall: '#b0a8f8', wallShadow: '#1c1440', trim: '#0a0820' },
+    { roof: '#1a4c48', roofAccent: '#2a7870', wall: '#94e4d8', wallShadow: '#0e2e2c', trim: '#040f0e' },
   ]
 
-  return palettes[Number(seed % BigInt(palettes.length))]
+  const paletteSets = [minePalettes, barracksPalettes, towerPalettes]
+  const set = paletteSets[buildingType % 3]
+  return set[lookSeed % set.length]
 }
 
 function getBuildingTitle(type: number) {
@@ -165,43 +200,166 @@ function formatCooldown(secondsLeft: number) {
   return `${seconds}s`
 }
 
-function renderPlacedBuilding(building: BuildingData, selected: boolean, currentTimeSec: number) {
-  const palette = getBuildingPalette(building.id)
-  const level = Number(building.id % BigInt(3))
-  const wallHeight = 18 + level * 4
-  const topHeight = TILE_HEIGHT
-  const frontTipY = topHeight + wallHeight
-  const occupied = new Set(building.occupiedCells.map((cell) => `${cell.row}:${cell.col}`))
-  const offsets = building.occupiedCells
-    .map((cell) => ({
-      row: cell.row,
-      col: cell.col,
-      left: (cell.col - cell.row) * (TILE_WIDTH / 2),
-      top: (cell.col + cell.row) * (TILE_HEIGHT / 2),
-      depth: cell.row + cell.col,
-    }))
-    .sort((a, b) => (a.depth - b.depth) || (a.left - b.left))
+function renderBuildingPreview(building: BuildingData) {
+  // Use the same renderPlacedBuilding renderer, scaled down for the inventory card.
+  // Force a single-cell footprint so the preview is always compact.
+  const previewBuilding: BuildingData = { ...building, occupiedCells: [{ row: 0, col: 0 }] }
 
-  const minLeft = Math.min(...offsets.map((offset) => offset.left))
-  const maxLeft = Math.max(...offsets.map((offset) => offset.left))
-  const maxTop = Math.max(...offsets.map((offset) => offset.top))
-  const width = maxLeft - minLeft + TILE_WIDTH
-  const height = maxTop + frontTipY
+  const wallHeightBases = [22, 30, 40]
+  const wallHeightPerLevel = [4, 5, 7]
+  const wH = wallHeightBases[building.buildingType % 3] + (building.level % 3) * wallHeightPerLevel[building.buildingType % 3]
+  const spireH = building.buildingType === 2 ? 24 + (building.level % 3) * 6 : 0
+  const flagH  = building.buildingType === 1 ? 18 + (building.level % 3) * 4 : 0
+  const topExtra = Math.max(spireH, flagH)
+  const svgH = topExtra + wH + TILE_HEIGHT + 4
+  const SCALE = 0.55
+
+  return (
+    <div
+      style={{
+        width: TILE_WIDTH * SCALE,
+        height: svgH * SCALE,
+        position: 'relative',
+        flexShrink: 0,
+        overflow: 'hidden',
+      }}
+    >
+      {/* Scale wrapper — its top-left corner is the tile N-vertex origin */}
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: (wH + topExtra) * SCALE,
+          width: TILE_WIDTH,
+          height: 0,
+          transform: `scale(${SCALE})`,
+          transformOrigin: 'top left',
+          pointerEvents: 'none',
+        }}
+      >
+        {renderPlacedBuilding(previewBuilding, false, 0)}
+      </div>
+    </div>
+  )
+}
+
+function renderPlacedBuilding(
+  building: BuildingData,
+  selected: boolean,
+  currentTimeSec: number,
+  handlers?: {
+    draggable: boolean
+    onDragStart: () => void
+    onDragEnd: () => void
+    onClick: () => void
+    onDragOver: (e: React.DragEvent) => void
+    onDrop: (e: React.DragEvent) => void
+  },
+) {
+  const buildingType = building.buildingType
+  const level = building.level
+  const lookSeed = getBuildingLookSeed(building.dna)
+  const palette = getBuildingTypePalette(buildingType, lookSeed)
+
+  // Walls rise UP from the tile ground diamond
+  const wallHeightBases = [22, 30, 40]
+  const wallHeightPerLevel = [4, 5, 7]
+  const wH = wallHeightBases[buildingType % 3] + (level % 3) * wallHeightPerLevel[buildingType % 3]
+
+  const HW = TILE_WIDTH / 2   // 48
+  const HH = TILE_HEIGHT / 2  // 26
+
+  const occupied = new Set(building.occupiedCells.map((c) => `${c.row}:${c.col}`))
+  const offsets = building.occupiedCells
+    .map((c) => ({
+      row: c.row,
+      col: c.col,
+      ol: (c.col - c.row) * HW,
+      ot: (c.col + c.row) * HH,
+      depth: c.row + c.col,
+    }))
+    .sort((a, b) => a.depth - b.depth || a.ol - b.ol)
+
+  const minOl = Math.min(...offsets.map((o) => o.ol))
+  const minOt = Math.min(...offsets.map((o) => o.ot))
+  const maxOl = Math.max(...offsets.map((o) => o.ol))
+  const maxOt = Math.max(...offsets.map((o) => o.ot))
+
+  const spireH = buildingType === 2 ? 24 + (level % 3) * 6 : 0
+  const flagH  = buildingType === 1 ? 18 + (level % 3) * 4 : 0
+  const topExtra = Math.max(spireH, flagH)
+
+  const svgW = maxOl - minOl + TILE_WIDTH
+  // SVG y=0 = spire/flag tip; ground S of bottom tile = topExtra + wH + maxOt + TH
+  const svgH = topExtra + wH + (maxOt - minOt) + TILE_HEIGHT + 4
+
   const resourceMarker = getResourceMarker(building.buildingType)
   const readyAt = Number(building.updateReadyTime)
   const ready = currentTimeSec >= readyAt
   const cooldownText = formatCooldown(Math.max(0, readyAt - currentTimeSec))
 
+  const bid = building.id.toString()
+
+  const pts = (coords: [number, number][]) =>
+    coords.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
+
+  // Left face: v=0→roof edge (top of wall), v=1→ground; u=0→W side, u=1→S side
+  // Ground: Wg=(tx,ty+HH), Sg=(tx+HW,ty+TH)  Roof: Wr=(tx,ty+HH-wH), Sr=(tx+HW,ty+TH-wH)
+  const lf = (tx: number, ty: number, u: number, v: number): [number, number] =>
+    [tx + u * HW, ty + HH - wH + u * HH + v * wH]
+
+  // Right face: v=0→roof edge, v=1→ground; u=0→S side, u=1→E side
+  // Ground: Sg=(tx+HW,ty+TH), Eg=(tx+TW,ty+HH)  Roof: Sr=(tx+HW,ty+TH-wH), Er=(tx+TW,ty+HH-wH)
+  const rf = (tx: number, ty: number, u: number, v: number): [number, number] =>
+    [tx + HW + u * HW, ty + TILE_HEIGHT - wH - u * HH + v * wH]
+
+  // Isometric-aligned parallelogram on a face (center cu,cv; half-extents du,dv)
+  const fp = (
+    fn: (tx: number, ty: number, u: number, v: number) => [number, number],
+    tx: number, ty: number,
+    cu: number, cv: number,
+    du: number, dv: number,
+  ) => pts([
+    fn(tx, ty, cu - du, cv - dv),
+    fn(tx, ty, cu + du, cv - dv),
+    fn(tx, ty, cu + du, cv + dv),
+    fn(tx, ty, cu - du, cv + dv),
+  ])
+
+  // ty = SVG y of tile's ground N vertex; ground S is at ty+TH = tile bottom
+  // Container top = -(wH+topExtra), so ground N → screen y = 0 (tile top) exactly
+  const tileVerts = offsets.map((offset) => {
+    const tx = offset.ol - minOl
+    const ty = topExtra + wH + (offset.ot - minOt)
+    const Wg: [number, number] = [tx,             ty + HH]
+    const Sg: [number, number] = [tx + HW,         ty + TILE_HEIGHT]
+    const Eg: [number, number] = [tx + TILE_WIDTH, ty + HH]
+    const Nr: [number, number] = [tx + HW,         ty - wH]
+    const Er: [number, number] = [tx + TILE_WIDTH, ty + HH - wH]
+    const Sr: [number, number] = [tx + HW,         ty + TILE_HEIGHT - wH]
+    const Wr: [number, number] = [tx,              ty + HH - wH]
+    return { tx, ty, Wg, Sg, Eg, Nr, Er, Sr, Wr }
+  })
+
   return (
     <div
+      draggable={handlers?.draggable}
+      onDragStart={handlers?.onDragStart}
+      onDragEnd={handlers?.onDragEnd}
+      onClick={handlers?.onClick}
+      onDragOver={handlers?.onDragOver}
+      onDrop={handlers?.onDrop}
       style={{
         position: 'absolute',
-        left: minLeft,
-        top: -wallHeight + 4,
-        width,
-        height,
-        filter: selected ? 'drop-shadow(0 10px 20px rgba(245, 158, 11, 0.35))' : 'drop-shadow(0 8px 14px rgba(15, 23, 42, 0.35))',
-        pointerEvents: 'none',
+        left: minOl,
+        top: minOt - (wH + topExtra),
+        width: svgW,
+        height: svgH,
+        filter: selected
+          ? 'drop-shadow(0 10px 20px rgba(245,158,11,0.45))'
+          : 'drop-shadow(0 6px 14px rgba(15,23,42,0.45))',
+        pointerEvents: handlers ? 'auto' : 'none',
+        cursor: handlers?.draggable ? 'grab' : 'default',
         zIndex: 4,
       }}
     >
@@ -210,7 +368,7 @@ function renderPlacedBuilding(building: BuildingData, selected: boolean, current
           style={{
             position: 'absolute',
             left: '50%',
-            top: 15,
+            top: 2,
             transform: 'translateX(-50%)',
             display: 'inline-flex',
             alignItems: 'center',
@@ -223,8 +381,10 @@ function renderPlacedBuilding(building: BuildingData, selected: boolean, current
             style={{
               ...resourceMarkerDot,
               color: resourceMarker.tint,
-              boxShadow: ready ? `0 0 0 3px ${resourceMarker.glow}, 0 10px 18px rgba(15, 23, 42, 0.28)` : '0 10px 18px rgba(15, 23, 42, 0.22)',
-              borderColor: ready ? resourceMarker.tint : 'rgba(148, 163, 184, 0.5)',
+              boxShadow: ready
+                ? `0 0 0 3px ${resourceMarker.glow}, 0 10px 18px rgba(15,23,42,0.28)`
+                : '0 10px 18px rgba(15,23,42,0.22)',
+              borderColor: ready ? resourceMarker.tint : 'rgba(148,163,184,0.5)',
             }}
           >
             {resourceMarker.label}
@@ -233,94 +393,179 @@ function renderPlacedBuilding(building: BuildingData, selected: boolean, current
         </div>
       )}
 
-      {offsets.map((offset, index) => (
-        <div
-          key={index}
-          style={{
-            position: 'absolute',
-            left: offset.left - minLeft,
-            top: offset.top,
-            width: TILE_WIDTH,
-            height: frontTipY,
-          }}
-        >
-          {(() => {
-            const showLeftFace = !occupied.has(`${offset.row + 1}:${offset.col}`)
-            const showRightFace = !occupied.has(`${offset.row}:${offset.col + 1}`)
+      <svg
+        width={svgW}
+        height={svgH}
+        style={{ position: 'absolute', left: 0, top: 0, overflow: 'visible', pointerEvents: 'none' }}
+      >
+        <defs>
+          <linearGradient id={`rf-${bid}`} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={palette.roofAccent} />
+            <stop offset="100%" stopColor={palette.roof} />
+          </linearGradient>
+          <linearGradient id={`lw-${bid}`} x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor={palette.wall} />
+            <stop offset="100%" stopColor={palette.wallShadow} />
+          </linearGradient>
+          <linearGradient id={`rw-${bid}`} x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor={palette.wallShadow} />
+            <stop offset="100%" stopColor={palette.trim} />
+          </linearGradient>
+          {buildingType === 0 && (
+            <pattern id={`hatch-${bid}`} width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <line x1="0" y1="0" x2="0" y2="7" stroke="rgba(0,0,0,0.18)" strokeWidth="1.5" />
+            </pattern>
+          )}
+          {buildingType === 2 && (
+            <radialGradient id={`glow-${bid}`} cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="rgba(200,230,255,0.95)" />
+              <stop offset="100%" stopColor="rgba(80,150,230,0.25)" />
+            </radialGradient>
+          )}
+          {/* Per-tile clip paths for decoration masking */}
+          {tileVerts.map(({ Wg, Sg, Eg, Sr, Wr, Er }, i) => (
+            <g key={i}>
+              <clipPath id={`lc-${bid}-${i}`}>
+                <polygon points={pts([Wg, Sg, Sr, Wr])} />
+              </clipPath>
+              <clipPath id={`rc-${bid}-${i}`}>
+                <polygon points={pts([Sg, Eg, Er, Sr])} />
+              </clipPath>
+            </g>
+          ))}
+        </defs>
 
-            return (
-              <>
-          <div
-            style={{
-              position: 'absolute',
-              left: 0,
-              right: 0,
-              top: 0,
-              height: topHeight,
-              clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',
-              background: `linear-gradient(180deg, ${palette.roofAccent} 0%, ${palette.roof} 100%)`,
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.22)',
-            }}
-          />
-                {showLeftFace && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: 0,
-                      top: topHeight / 2 - 6,
-                      width: TILE_WIDTH / 2,
-                      height: topHeight / 2 + wallHeight,
-                      clipPath: 'polygon(0% 0%, 100% 50%, 100% 100%, 0% 64%)',
-                      background: `linear-gradient(180deg, ${palette.wall} 0%, ${palette.wallShadow} 100%)`,
-                      boxShadow: 'inset 3px 0 0 rgba(255,255,255,0.1), inset 0 -4px 0 rgba(0,0,0,0.08)',
-                    }}
+        {offsets.map((offset, index) => {
+          const showLeft  = !occupied.has(`${offset.row + 1}:${offset.col}`)
+          const showRight = !occupied.has(`${offset.row}:${offset.col + 1}`)
+          const isTopTile = index === 0
+
+          const { tx, ty, Wg, Sg, Eg, Nr, Er, Sr, Wr } = tileVerts[index]
+
+          return (
+            <g key={index}>
+              {/* Right face (further, draw first) */}
+              {showRight && (
+                <g>
+                  <polygon points={pts([Sg, Eg, Er, Sr])} fill={`url(#rw-${bid})`} stroke={palette.trim} strokeWidth="0.5" />
+                  {[0.3, 0.62].map((v, i) => (
+                    <line key={i}
+                      x1={rf(tx, ty, 0, v)[0]} y1={rf(tx, ty, 0, v)[1]}
+                      x2={rf(tx, ty, 1, v)[0]} y2={rf(tx, ty, 1, v)[1]}
+                      stroke="rgba(0,0,0,0.1)" strokeWidth="0.8" clipPath={`url(#rc-${bid}-${index})`}
+                    />
+                  ))}
+                  <line x1={Sg[0]} y1={Sg[1]} x2={Eg[0]} y2={Eg[1]} stroke="rgba(255,255,255,0.14)" strokeWidth="1" />
+                  {buildingType === 0 && (
+                    <>
+                      <line
+                        x1={rf(tx, ty, 0.18, 0.2)[0]}  y1={rf(tx, ty, 0.18, 0.2)[1]}
+                        x2={rf(tx, ty, 0.62, 0.72)[0]} y2={rf(tx, ty, 0.62, 0.72)[1]}
+                        stroke="rgba(210,170,60,0.65)" strokeWidth="1.5" clipPath={`url(#rc-${bid}-${index})`}
+                      />
+                      <line
+                        x1={rf(tx, ty, 0.42, 0.12)[0]} y1={rf(tx, ty, 0.42, 0.12)[1]}
+                        x2={rf(tx, ty, 0.78, 0.54)[0]} y2={rf(tx, ty, 0.78, 0.54)[1]}
+                        stroke="rgba(210,170,60,0.4)" strokeWidth="1" clipPath={`url(#rc-${bid}-${index})`}
+                      />
+                    </>
+                  )}
+                  {buildingType === 1 && (
+                    <polygon points={fp(rf, tx, ty, 0.5, 0.4, 0.05, 0.28)} fill="rgba(4,10,24,0.88)" />
+                  )}
+                  {buildingType === 2 && (
+                    <>
+                      <polygon points={fp(rf, tx, ty, 0.5, 0.38, 0.068, 0.3)} fill={`url(#glow-${bid})`} />
+                      <polygon points={fp(rf, tx, ty, 0.5, 0.38, 0.068, 0.3)} fill="none" stroke="rgba(140,200,255,0.85)" strokeWidth="1" />
+                      <circle cx={rf(tx, ty, 0.5, 0.22)[0]} cy={rf(tx, ty, 0.5, 0.22)[1]} r="2" fill="rgba(220,240,255,0.7)" />
+                    </>
+                  )}
+                </g>
+              )}
+
+              {/* Left face (closer to camera) */}
+              {showLeft && (
+                <g>
+                  <polygon points={pts([Wg, Sg, Sr, Wr])} fill={`url(#lw-${bid})`} stroke={palette.trim} strokeWidth="0.5" />
+                  {[0.3, 0.62].map((v, i) => (
+                    <line key={i}
+                      x1={lf(tx, ty, 0, v)[0]} y1={lf(tx, ty, 0, v)[1]}
+                      x2={lf(tx, ty, 1, v)[0]} y2={lf(tx, ty, 1, v)[1]}
+                      stroke="rgba(0,0,0,0.1)" strokeWidth="0.8" clipPath={`url(#lc-${bid}-${index})`}
+                    />
+                  ))}
+                  <line x1={Wg[0]} y1={Wg[1]} x2={Sg[0]} y2={Sg[1]} stroke="rgba(255,255,255,0.18)" strokeWidth="1" />
+                  {buildingType === 0 && (
+                    <>
+                      {/* Timber lintel */}
+                      <polygon points={fp(lf, tx, ty, 0.35, 0.08, 0.27, 0.06)} fill="#8b6030" />
+                      {/* Left post */}
+                      <polygon points={fp(lf, tx, ty, 0.1,  0.52, 0.038, 0.42)} fill="#7a5228" />
+                      {/* Right post */}
+                      <polygon points={fp(lf, tx, ty, 0.6,  0.52, 0.038, 0.42)} fill="#6b4520" />
+                      {/* Shaft opening */}
+                      <polygon points={fp(lf, tx, ty, 0.35, 0.54, 0.22,  0.42)} fill="rgba(4,2,0,0.96)" />
+                      {/* Interior glow */}
+                      <polygon points={fp(lf, tx, ty, 0.35, 0.92, 0.14,  0.06)} fill="rgba(60,40,10,0.55)" />
+                    </>
+                  )}
+                  {buildingType === 1 && (
+                    <polygon points={fp(lf, tx, ty, 0.35, 0.4, 0.06, 0.3)} fill="rgba(4,10,24,0.88)" />
+                  )}
+                  {buildingType === 2 && (
+                    <>
+                      <polygon points={fp(lf, tx, ty, 0.35, 0.38, 0.07, 0.32)} fill={`url(#glow-${bid})`} />
+                      <polygon points={fp(lf, tx, ty, 0.35, 0.38, 0.07, 0.32)} fill="none" stroke="rgba(140,200,255,0.85)" strokeWidth="1" />
+                      <circle cx={lf(tx, ty, 0.35, 0.22)[0]} cy={lf(tx, ty, 0.35, 0.22)[1]} r="2" fill="rgba(220,240,255,0.7)" />
+                    </>
+                  )}
+                </g>
+              )}
+
+              {/* Roof face */}
+              <polygon points={pts([Nr, Er, Sr, Wr])} fill={`url(#rf-${bid})`} stroke={palette.trim} strokeWidth="0.5" />
+              <line x1={Nr[0]} y1={Nr[1]} x2={Wr[0]} y2={Wr[1]} stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
+              <line x1={Nr[0]} y1={Nr[1]} x2={Er[0]} y2={Er[1]} stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
+              {buildingType === 0 && (
+                <polygon points={pts([Nr, Er, Sr, Wr])} fill={`url(#hatch-${bid})`} opacity="0.65" />
+              )}
+
+              {/* Barracks: flagpole + flag (top tile only) */}
+              {buildingType === 1 && isTopTile && (
+                <>
+                  <line
+                    x1={tx + HW} y1={ty - wH - flagH}
+                    x2={tx + HW} y2={ty - wH + HH}
+                    stroke="#c0a070" strokeWidth="2"
                   />
-                )}
-                {showRightFace && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      right: 0,
-                      top: topHeight / 2 - 6,
-                      width: TILE_WIDTH / 2,
-                      height: topHeight / 2 + wallHeight,
-                      clipPath: 'polygon(0% 50%, 100% 0%, 100% 64%, 0% 100%)',
-                      background: `linear-gradient(180deg, ${palette.wallShadow} 0%, ${palette.trim} 100%)`,
-                      boxShadow: 'inset -3px 0 0 rgba(0,0,0,0.12), inset 0 -4px 0 rgba(0,0,0,0.1)',
-                    }}
+                  <circle cx={tx + HW} cy={ty - wH - flagH} r="2.5" fill="#e8c880" />
+                  <polygon
+                    points={`${tx + HW + 1},${ty - wH - flagH + 3} ${tx + HW + 22},${ty - wH - flagH + 9} ${tx + HW + 1},${ty - wH - flagH + 16}`}
+                    fill="#dc2626" stroke="#b91c1c" strokeWidth="0.5"
                   />
-                )}
-                {showLeftFace && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: 12,
-                      top: topHeight / 2 + 8,
-                      width: 6,
-                      height: 10,
-                      borderRadius: 2,
-                      background: 'rgba(255, 248, 220, 0.88)',
-                    }}
+                </>
+              )}
+
+              {/* Tower: pointed spire (top tile only) */}
+              {buildingType === 2 && isTopTile && (
+                <>
+                  <polygon
+                    points={pts([[tx + HW, ty - wH - spireH], [tx + HW + 10, ty - wH + HH], [tx + HW - 10, ty - wH + HH]])}
+                    fill={`url(#rf-${bid})`}
+                    stroke={palette.trim}
+                    strokeWidth="0.5"
                   />
-                )}
-                {showRightFace && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      right: 14,
-                      top: topHeight / 2 + 9,
-                      width: 6,
-                      height: 9,
-                      borderRadius: 2,
-                      background: 'rgba(255, 248, 220, 0.72)',
-                    }}
+                  <line
+                    x1={tx + HW}      y1={ty - wH - spireH}
+                    x2={tx + HW - 10} y2={ty - wH + HH}
+                    stroke="rgba(255,255,255,0.25)" strokeWidth="1"
                   />
-                )}
-              </>
-            )
-          })()}
-        </div>
-      ))}
+                </>
+              )}
+            </g>
+          )
+        })}
+      </svg>
     </div>
   )
 }
@@ -337,16 +582,6 @@ const boardDecorations: Decoration[] = [
     opacity: 0.9,
   },
   {
-    right: 26,
-    top: 42,
-    width: 88,
-    height: 58,
-    background: 'radial-gradient(circle at 30% 35%, #fef3c7 0%, #d6d3d1 46%, #78716c 100%)',
-    borderRadius: '50% 50% 44% 56% / 44% 56% 44% 56%',
-    transform: 'rotate(-10deg)',
-    boxShadow: 'inset 0 3px 0 rgba(255,255,255,0.22), 0 10px 18px rgba(68, 64, 60, 0.18)',
-  },
-  {
     left: 40,
     bottom: 38,
     width: 86,
@@ -355,17 +590,6 @@ const boardDecorations: Decoration[] = [
     borderRadius: '59% 41% 50% 50% / 48% 53% 47% 52%',
     boxShadow: 'inset 0 3px 0 rgba(255,255,255,0.18), 0 10px 18px rgba(63, 98, 18, 0.18)',
     opacity: 0.92,
-  },
-  {
-    right: 34,
-    bottom: 26,
-    width: 112,
-    height: 72,
-    background: 'radial-gradient(circle at 50% 35%, #e7e5e4 0%, #a8a29e 52%, #57534e 100%)',
-    borderRadius: '48% 52% 45% 55% / 46% 40% 60% 54%',
-    transform: 'rotate(14deg)',
-    boxShadow: 'inset 0 4px 0 rgba(255,255,255,0.2), 0 12px 20px rgba(87, 83, 78, 0.18)',
-    opacity: 0.82,
   },
 ]
 
@@ -391,6 +615,9 @@ export default function Page() {
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [cityContractReady, setCityContractReady] = useState<boolean | null>(null)
+  const boardRef = useRef<HTMLDivElement | null>(null)
+
+
   const selectedLayerIndex = Number(selectedLayer)
   const availableLayerCount = Math.max((cityStats?.level ?? 0) + 1, 1)
 
@@ -893,13 +1120,45 @@ export default function Page() {
     })
   }
 
-  async function handleDrop(row: number, col: number) {
-    if (!draggingBuilding || canDropHere !== true || txPending) return
+  const getBoardHoverCell = useCallback((clientX: number, clientY: number) => {
+    const board = boardRef.current
+    if (!board) return null
+
+    const rect = board.getBoundingClientRect()
+    const localX = clientX - rect.left
+    const localY = clientY - rect.top
+
+    let closest: { row: number; col: number } | null = null
+    let closestDistance = Number.POSITIVE_INFINITY
+
+    for (let row = 0; row < GRID_SIZE; row += 1) {
+      for (let col = 0; col < GRID_SIZE; col += 1) {
+        const centerX = (col - row + GRID_SIZE - 1) * (TILE_WIDTH / 2) + TILE_WIDTH / 2
+        const centerY = (col + row) * (TILE_HEIGHT / 2) + TILE_HEIGHT / 2
+        const dx = localX - centerX
+        const dy = localY - centerY
+        const distance = dx * dx + dy * dy
+
+        if (distance < closestDistance) {
+          closestDistance = distance
+          closest = { row, col }
+        }
+      }
+    }
+
+    return closest
+  }, [])
+
+  async function handleDrop(targetCell = hoverCell) {
+    if (!draggingBuilding || !targetCell || txPending) return
+
+    const allowed = localCanPlace(draggingBuilding, targetCell.row, targetCell.col)
+    if (!allowed) return
 
     if (draggingBuilding.isActive) {
-      await relocateBuilding(draggingBuilding.id, row, col)
+      await relocateBuilding(draggingBuilding.id, targetCell.row, targetCell.col)
     } else {
-      await placeBuilding(draggingBuilding.id, row, col)
+      await placeBuilding(draggingBuilding.id, targetCell.row, targetCell.col)
       setInventoryOpen(false)
     }
 
@@ -1079,7 +1338,30 @@ export default function Page() {
                 />
               ))}
 
-              <div style={cityBoard}>
+              <div
+                ref={boardRef}
+                style={cityBoard}
+                onDragOver={(event) => {
+                  event.preventDefault()
+                  if (!draggingBuildingId || deleteMode) return
+
+                  const nextHoverCell = getBoardHoverCell(event.clientX, event.clientY)
+                  if (nextHoverCell) {
+                    setHoverCell(nextHoverCell)
+                  }
+                }}
+                onDrop={(event) => {
+                  event.preventDefault()
+                  if (deleteMode) return
+
+                  const nextHoverCell = getBoardHoverCell(event.clientX, event.clientY)
+                  if (nextHoverCell) {
+                    setHoverCell(nextHoverCell)
+                  }
+
+                  void handleDrop(nextHoverCell)
+                }}
+              >
                 {grid.flat().map((cell) => {
                   const selected = selectedCell?.row === cell.row && selectedCell?.col === cell.col
                   const previewState = previewCells.some((previewCell) => previewCell.row === cell.row && previewCell.col === cell.col)
@@ -1102,8 +1384,9 @@ export default function Page() {
                       }}
                       onDrop={async (event) => {
                         event.preventDefault()
+                        event.stopPropagation()
                         if (deleteMode) return
-                        await handleDrop(cell.row, cell.col)
+                        await handleDrop()
                       }}
                       style={{
                         ...tileButton,
@@ -1118,6 +1401,7 @@ export default function Page() {
                       }}
                       title={cell.buildingId === BigInt(0) ? 'Empty tile' : `Building #${cell.buildingId.toString()}`}
                     >
+                      <div style={tileBorderDiamond} />
                       <div style={tileGround} />
                       <div style={tileGrassTexture} />
                       <div style={tileGrassHighlight} />
@@ -1130,18 +1414,16 @@ export default function Page() {
                           }}
                         />
                       )}
-                      <div style={tileShade} />
-                      {cell.buildingId === BigInt(0) && (
-                        <>
-                          <div style={emptyPatchStyle} />
-                          <div style={emptyStoneStyle} />
-                        </>
-                      )}
                     </button>
                   )
                 })}
 
-                {activeBuildings.map((building) => {
+                {[...activeBuildings]
+                  .sort((a, b) => {
+                    if (!a.position || !b.position) return 0
+                    return (a.position.row + a.position.col) - (b.position.row + b.position.col)
+                  })
+                  .map((building) => {
                   if (!building.position) return null
 
                   const selected = selectedCell?.row === building.position.row && selectedCell?.col === building.position.col
@@ -1152,13 +1434,30 @@ export default function Page() {
                         position: 'absolute',
                         left: (building.position.col - building.position.row + GRID_SIZE - 1) * (TILE_WIDTH / 2),
                         top: (building.position.col + building.position.row) * (TILE_HEIGHT / 2),
-                        width: TILE_WIDTH,
-                        height: TILE_HEIGHT,
+                        width: 0,
+                        height: 0,
                         pointerEvents: 'none',
                         overflow: 'visible',
                       }}
                     >
-                      {renderPlacedBuilding(building, selected, currentTimeSec)}
+                      {renderPlacedBuilding(building, selected, currentTimeSec, {
+                        draggable: !deleteMode,
+                        onDragStart: () => setDraggingBuildingId(building.id.toString()),
+                        onDragEnd: resetDragState,
+                        onClick: () => handleTileClick({ row: building.position!.row, col: building.position!.col, buildingId: building.id }),
+                        onDragOver: (e) => {
+                          e.preventDefault()
+                          if (!draggingBuildingId || deleteMode) return
+                          // Hover targets this building's own anchor tile — avoids height-offset errors from clientToTile
+                          setHoverCell({ row: building.position!.row, col: building.position!.col })
+                        },
+                        onDrop: (e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          if (deleteMode) return
+                          void handleDrop()
+                        },
+                      })}
                     </div>
                   )
                 })}
@@ -1259,12 +1558,15 @@ export default function Page() {
                     <div style={dragBadge}>{deleteMode ? 'locked' : 'drag'}</div>
                   </div>
 
-                  <div style={shapeGrid}>
-                    {Array.from({ length: 9 }, (_, index) => {
-                      const row = Math.floor(index / 3)
-                      const col = index % 3
-                      return <div key={index} style={hasShapeBit(building.shapeMask, row, col) ? shapeCellFilled : shapeCellEmpty} />
-                    })}
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', marginTop: 8 }}>
+                    {renderBuildingPreview(building)}
+                    <div style={shapeGrid}>
+                      {Array.from({ length: 9 }, (_, index) => {
+                        const row = Math.floor(index / 3)
+                        const col = index % 3
+                        return <div key={index} style={hasShapeBit(building.shapeMask, row, col) ? shapeCellFilled : shapeCellEmpty} />
+                      })}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1697,19 +1999,37 @@ const tileButton: React.CSSProperties = {
   transition: 'transform 140ms ease, filter 140ms ease',
 }
 
+// Dark diamond border (full tile size) — shows as a 1 px grid line
+// around the slightly-inset grass diamond drawn on top of it.
+const tileBorderDiamond: React.CSSProperties = {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',
+  background: 'rgba(28, 60, 12, 0.55)',
+}
+
 const tileGround: React.CSSProperties = {
   position: 'absolute',
-  inset: 0,
+  top: 1,
+  left: 1,
+  right: 1,
+  bottom: 1,
   clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',
-  background: 'linear-gradient(135deg, #9be25b 0%, #8dd951 26%, #77c446 62%, #68ac3c 100%)',
-  boxShadow: 'inset 0 2px 0 rgba(255, 255, 255, 0.18), inset -7px -7px 0 rgba(61, 118, 34, 0.15)',
+  background: 'linear-gradient(135deg, #a8e868 0%, #92d956 22%, #7cc448 58%, #64a83a 100%)',
+  boxShadow: 'inset 0 2px 0 rgba(255, 255, 255, 0.2), inset -6px -6px 0 rgba(50, 100, 24, 0.16)',
 }
 
 const tileGrassTexture: React.CSSProperties = {
   position: 'absolute',
-  inset: 0,
+  top: 1,
+  left: 1,
+  right: 1,
+  bottom: 1,
   clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',
-  background: 'repeating-linear-gradient(120deg, rgba(185, 255, 138, 0.16) 0 2px, rgba(0, 0, 0, 0) 2px 8px), repeating-linear-gradient(55deg, rgba(76, 145, 35, 0.15) 0 3px, rgba(0, 0, 0, 0) 3px 10px)',
+  background: 'repeating-linear-gradient(120deg, rgba(200, 255, 150, 0.14) 0 2px, rgba(0, 0, 0, 0) 2px 8px), repeating-linear-gradient(55deg, rgba(70, 140, 30, 0.13) 0 3px, rgba(0, 0, 0, 0) 3px 10px)',
   opacity: 0.95,
 }
 
@@ -1722,7 +2042,10 @@ const tileGrassHighlight: React.CSSProperties = {
 
 const previewOverlay: React.CSSProperties = {
   position: 'absolute',
-  inset: 0,
+  top: 1,
+  left: 1,
+  right: 1,
+  bottom: 1,
   clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',
 }
 
@@ -1769,23 +2092,3 @@ const resourceCooldownPill: React.CSSProperties = {
   whiteSpace: 'nowrap',
 }
 
-const emptyPatchStyle: React.CSSProperties = {
-  position: 'absolute',
-  left: Math.round(TILE_WIDTH * 0.26),
-  right: Math.round(TILE_WIDTH * 0.28),
-  bottom: Math.round(TILE_HEIGHT * 0.42),
-  height: Math.round(TILE_HEIGHT * 0.2),
-  borderRadius: 999,
-  background: 'rgba(194, 247, 130, 0.42)',
-  transform: 'rotate(-18deg)',
-}
-
-const emptyStoneStyle: React.CSSProperties = {
-  position: 'absolute',
-  right: Math.round(TILE_WIDTH * 0.29),
-  bottom: Math.round(TILE_HEIGHT * 0.42),
-  width: Math.round(TILE_WIDTH * 0.11),
-  height: Math.round(TILE_HEIGHT * 0.14),
-  borderRadius: 999,
-  background: 'rgba(111, 135, 74, 0.8)',
-}
