@@ -840,6 +840,7 @@ export default function HeroesPage() {
                   </div>
                 </div>
 
+                {/*
                 <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
                   <div className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">Tournament</div>
                   <div className="mt-4 grid gap-3">
@@ -860,6 +861,7 @@ export default function HeroesPage() {
                     </button>
                   </div>
                 </div>
+                */}
 
                 <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
                   <div className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">Stats breakdown</div>

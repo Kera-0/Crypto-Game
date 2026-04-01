@@ -121,6 +121,8 @@ contract PvPBattles {
     ) internal view returns (address winner, address loser, uint256 rounds) {
         SumStats memory a = _summirize(attacker);
         SumStats memory d = _summirize(defender);
+        (, , uint256 aDef) = city.getCityStats(attacker);
+        a.def_ -= aDef;
 
         bool attackerTurn = a.agi >= d.agi;
 
