@@ -26,14 +26,33 @@ contract BuildingItem is Ownable {
     mapping(uint256 => uint256) public buildingIdToOwnerIndex;
     
     IBuildingMarketplace public marketplace;
+    address public minter; // the marketplace contract that can mint new buildings
 
     function setMarketplace(address m) external onlyOwner {
         marketplace = IBuildingMarketplace(m);
     }
 
-    modifier onlyMarketplace() { 
+    function setMinter(address m) external onlyOwner {
+        minter = m;
+    }
+
+    modifier onlyMarketplace() {
         require(msg.sender == address(marketplace));
-        _; 
+        _;
+    }
+
+    modifier onlyMinter() {
+        require(msg.sender == minter, "not minter");
+        _;
+    }
+
+    /// @notice Mint a new building directly to `to` with the given DNA.
+    ///         Called by the marketplace when a player buys from the official stock.
+    function mint(address to, uint64 dna) external onlyMinter returns (uint256) {
+        buildings.push(Building(dna, 1, uint256(block.timestamp + 4 hours), false));
+        uint256 id = buildings.length - 1;
+        _addBuildingToOwner(to, id);
+        return id;
     }
     
     function _addBuildingToOwner(address owner, uint256 buildingId) internal {

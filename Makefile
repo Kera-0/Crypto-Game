@@ -21,6 +21,7 @@ qhh:
 
 .SILENT: deploy-local
 deploy-local:
-	docker exec -it $(NAME) sh -lc "cd /app && pnpm hardhat run scripts/deploy-local.ts --network localhost"
+	docker exec $(NAME) sh -lc "cd /app && pnpm hardhat run scripts/deploy-local.ts --network localhost"
 	docker cp $(NAME):/app/deploy-frontend.env ./frontend/.env.local
 	docker cp $(NAME):/app/deploy-root.env ./.env
+	docker compose up -d --force-recreate frontend

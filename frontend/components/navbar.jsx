@@ -95,7 +95,8 @@ export function Navbar() {
     { href: '/', label: 'Cities' },
     { href: '/heroes', label: 'Heroes' },
     { href: '/pvp', label: 'PvP' },
-    { href: '/marketplace', label: 'Marketplace' },
+    { href: '/marketplace', label: 'Heroes Market' },
+    { href: '/marketplace/buildings', label: 'Buildings Market' },
   ]
 
   return (

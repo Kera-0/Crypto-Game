@@ -16,6 +16,7 @@ const hero = await viem.deployContract("HeroNFT", [deployer.account.address]);
 const pack = await viem.deployContract("PackOpenerLocal", [heroCurrency.address, hero.address, parseEther("25")]);
 const pvp = await viem.deployContract("PvPBattlesTournament", [hero.address, city.address, cityToken.address, deployer.account.address]);
 const heroMarketplace = await viem.deployContract("HeroMarketplace", [deployer.account.address, hero.address, heroCurrency.address]);
+const buildingMarketplace = await viem.deployContract("BuildingMarketplace", []);
 
 
 await deployer.writeContract({
@@ -88,6 +89,51 @@ await deployer.writeContract({
   args: [pvp.address],
 });
 
+// city IS a BuildingItem (CityFiled extends BuildingFactory extends BuildingItem)
+// so the marketplace must use the city contract as its building item
+await deployer.writeContract({
+  address: city.address,
+  abi: city.abi,
+  functionName: "setMarketplace",
+  args: [buildingMarketplace.address],
+});
+
+await deployer.writeContract({
+  address: city.address,
+  abi: city.abi,
+  functionName: "setMinter",
+  args: [buildingMarketplace.address],
+});
+
+await deployer.writeContract({
+  address: buildingMarketplace.address,
+  abi: buildingMarketplace.abi,
+  functionName: "setBuildingItem",
+  args: [city.address],
+});
+
+// Set prices for building types: Mine (0), Barracks (1), Tower (2)
+await deployer.writeContract({
+  address: buildingMarketplace.address,
+  abi: buildingMarketplace.abi,
+  functionName: "setStockPrice",
+  args: [0, parseEther("0.01")],
+});
+
+await deployer.writeContract({
+  address: buildingMarketplace.address,
+  abi: buildingMarketplace.abi,
+  functionName: "setStockPrice",
+  args: [1, parseEther("0.015")],
+});
+
+await deployer.writeContract({
+  address: buildingMarketplace.address,
+  abi: buildingMarketplace.abi,
+  functionName: "setStockPrice",
+  args: [2, parseEther("0.02")],
+});
+
 const blockNumber = await publicClient.getBlockNumber();
 const frontendEnv = [
   `NEXT_PUBLIC_CITY_ADDRESS=${city.address}`,
@@ -97,6 +143,8 @@ const frontendEnv = [
   `NEXT_PUBLIC_PACK_OPENER_ADDRESS=${pack.address}`,
   `NEXT_PUBLIC_PVP_BATTLES_ADDRESS=${pvp.address}`,
   `NEXT_PUBLIC_HERO_MARKETPLACE_ADDRESS=${heroMarketplace.address}`,
+  `NEXT_PUBLIC_BUILDING_ITEM_ADDRESS=${city.address}`,
+  `NEXT_PUBLIC_BUILDING_MARKETPLACE_ADDRESS=${buildingMarketplace.address}`,
 ].join("\n");
 
 const rootEnv = [
